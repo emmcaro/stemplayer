@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>StemStudio Drive</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <title>StemStudio Drive Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -39,7 +39,7 @@
     /* Explorador de Carpetes Drive */
     .browser-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
     .folder-path { font-weight: 700; color: var(--primary); font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .folder-list { max-height: 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .folder-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
     .folder-item {
       background: var(--bg); padding: 10px 12px; border-radius: 8px; display: flex;
       justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid var(--surface-light);
@@ -81,7 +81,8 @@
       gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-light);
     }
     .stem-row:last-child { border-bottom: none; }
-    .stem-name { font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stem-name { font-weight: 700; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+    .stem-name.is-original { color: var(--muted); font-style: italic; }
     .btn-ms { padding: 7px 0; font-size: 0.78rem; background: var(--surface-light); color: var(--text); }
     .btn-ms.muted { background: var(--accent); color: #fff; }
     .btn-ms.soloed { background: var(--solo); color: #000; }
@@ -98,7 +99,7 @@
 <body>
 
   <h1>
-    <span>🎛️ StemStudio Drive</span>
+    <span>🎛️ StemStudio Pro</span>
     <button class="secondary" style="padding:6px 10px;font-size:0.8rem" onclick="toggleConfig()">⚙️ Drive URL</button>
   </h1>
 
@@ -120,7 +121,7 @@
     </div>
 
     <div id="stemsReadyBox" class="stems-ready-box" style="display:none">
-      <span id="stemsReadyLabel" style="font-size:0.88rem;font-weight:700">6 stems trobats</span>
+      <span id="stemsReadyLabel" style="font-size:0.88rem;font-weight:700">Pistes trobades</span>
       <button class="active-green" style="padding:7px 12px" onclick="loadCurrentFolderStems()">Carregar</button>
     </div>
 
@@ -215,18 +216,21 @@
   </div>
 
 <script>
+  let audioCtx = null;
+  let scriptNode = null;
+  let stHarmonic = null; // SoundTouch amb canvi de Pitch + Tempo
+  let stDrums = null;    // SoundTouch només amb Tempo (Pitch fix a 0)
+  let stemsData = [];    // { name, buffer, muted, soloed, volume, isDrum, isOriginal }
+
   let folderHistory = [];
   let currentFolderStems = [];
   let currentFolderTitle = "";
 
-  let players = [];
-  let pitchShiftNode = null;
   let isPlaying = false;
   let isCountingIn = false;
   let countInEnabled = false;
   let songDuration = 0;
-  let currentOffset = 0;
-  let lastPlayTimestamp = 0;
+  let samplePosition = 0;
   let currentPitch = 0;
   let currentTempo = 1.0;
   let baseBpm = 120;
@@ -238,7 +242,6 @@
   let metroEnabled = false;
   let metroVolume = 0.7;
   let lastPlayedBeatIndex = -1;
-  let metroSynth = null;
   let tapTimes = [];
 
   const NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
@@ -251,6 +254,16 @@
       browseFolder("root");
     }
   };
+
+  function ensureAudioContext() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  }
 
   function toggleConfig() {
     const el = document.getElementById("configCard");
@@ -297,16 +310,14 @@
       currentFolderTitle = data.currentName;
       currentFolderStems = data.stems || [];
 
-      // Mostra el botó verd si hi ha stems dins aquesta carpeta
       const readyBox = document.getElementById("stemsReadyBox");
       if (currentFolderStems.length > 0) {
         readyBox.style.display = "flex";
-        document.getElementById("stemsReadyLabel").textContent = `🎵 ${currentFolderStems.length} stems trobats aquí`;
+        document.getElementById("stemsReadyLabel").textContent = `🎵 ${currentFolderStems.length} arxius d'àudio trobats`;
       } else {
         readyBox.style.display = "none";
       }
 
-      // Llista les subcarpetes
       const listEl = document.getElementById("folderList");
       listEl.innerHTML = "";
       if (data.folders.length === 0 && currentFolderStems.length === 0) {
@@ -334,87 +345,222 @@
     browseFolder(prevId, true);
   }
 
+  // Classifica els arxius: detecta quins són instruments i quin és l'MP3 original sense nom d'instrument
+  function classifyTrackNames(names) {
+    if (names.length <= 1) {
+      return names.map(n => ({ displayName: n, isOriginal: false }));
+    }
+
+    // Troba el prefix comú entre tots els arxius de la carpeta
+    let prefix = names[0];
+    for (let i = 1; i < names.length; i++) {
+      while (names[i].indexOf(prefix) !== 0) {
+        prefix = prefix.substring(0, prefix.length - 1);
+        if (prefix === "") break;
+      }
+    }
+
+    const KNOWN_INSTRUMENTS = /(vocal|veu|voice|drum|bat|perc|bass|baix|guitar|guit|piano|key|teclat|other|altre|instr|stem|synth)/i;
+
+    return names.map(name => {
+      let remainder = name.slice(prefix.length).replace(/^[\s\-_.:()\[\]]+/, "").trim();
+      // Si no queda res després del prefix comú (és el nom exacte de la cançó)
+      // o si no conté cap paraula d'instrument mentre la resta sí que en tenen
+      const isOriginal = remainder === "" || (!KNOWN_INSTRUMENTS.test(remainder) && names.some(other => KNOWN_INSTRUMENTS.test(other.slice(prefix.length))));
+
+      return {
+        displayName: isOriginal ? "Original" : remainder,
+        isOriginal
+      };
+    });
+  }
+
   async function loadCurrentFolderStems() {
     if (currentFolderStems.length === 0) return;
-    await Tone.start();
+    ensureAudioContext();
     stopPlayback();
     clearLoop();
 
     const url = localStorage.getItem("stemstudio_url");
+    let completed = 0;
+    const total = currentFolderStems.length;
+    setStatus(`Baixant ${total} pistes en paral·lel (0/${total})...`);
 
-    players.forEach(p => { p.player.dispose(); p.gain.dispose(); });
-    players = [];
-    if (pitchShiftNode) pitchShiftNode.dispose();
+    try {
+      const downloadPromises = currentFolderStems.map(async (stem) => {
+        const res = await fetch(`${url}?action=audio&fileId=${stem.id}`, { redirect: "follow" });
+        const json = await res.json();
 
-    pitchShiftNode = new Tone.PitchShift({
-      pitch: currentPitch,
-      windowSize: 0.1,
-      delayTime: 0,
-      feedback: 0
-    }).toDestination();
+        const byteRes = await fetch(`data:${json.mimeType || 'audio/mp3'};base64,${json.data}`);
+        const arrayBuffer = await byteRes.arrayBuffer();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-    const rawBuffers = [];
-
-    for (let i = 0; i < currentFolderStems.length; i++) {
-      const stem = currentFolderStems[i];
-      setStatus(`Descarregant (${i + 1}/${currentFolderStems.length}): ${stem.name}...`);
-
-      const res = await fetch(`${url}?action=audio&fileId=${stem.id}`, { redirect: "follow" });
-      const json = await res.json();
-
-      const binary = atob(json.data);
-      const bytes = new Uint8Array(binary.length);
-      for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-
-      const audioBuffer = await Tone.context.decodeAudioData(bytes.buffer);
-      rawBuffers.push({ name: stem.name, buffer: audioBuffer });
-
-      const gainNode = new Tone.Gain(1).connect(pitchShiftNode);
-      const player = new Tone.Player(audioBuffer).connect(gainNode);
-      player.playbackRate = currentTempo;
-
-      players.push({
-        name: stem.name,
-        player,
-        gain: gainNode,
-        muted: false,
-        soloed: false,
-        volume: 1
+        completed++;
+        setStatus(`Baixant i decodificant (${completed}/${total})...`);
+        return { rawName: stem.name, buffer: audioBuffer };
       });
+
+      const results = await Promise.all(downloadPromises);
+      const classified = classifyTrackNames(results.map(r => r.rawName));
+
+      stemsData = results.map((r, idx) => {
+        const info = classified[idx];
+        const isDrum = !info.isOriginal && /drum|bat|perc/i.test(info.displayName);
+        return {
+          name: info.displayName,
+          buffer: r.buffer,
+          muted: info.isOriginal, // Silenciada per defecte si és la pista original
+          soloed: false,
+          volume: 1.0,
+          isDrum,
+          isOriginal: info.isOriginal
+        };
+      });
+
+      // Ordena perquè "Original" quedi al final del mesclador
+      stemsData.sort((a, b) => (a.isOriginal === b.isOriginal ? 0 : a.isOriginal ? 1 : -1));
+
+      songDuration = Math.max(...stemsData.map(s => s.buffer.duration));
+      document.getElementById("seekBar").max = songDuration;
+      document.getElementById("timeTotal").textContent = formatTime(songDuration);
+
+      setStatus("Detectant BPM i acords...");
+      await new Promise(r => setTimeout(r, 30));
+
+      const onlyStems = stemsData.filter(s => !s.isOriginal);
+      const analysisSources = onlyStems.length > 0 ? onlyStems : stemsData;
+
+      const tempoInfo = detectBpmFromBuffers(analysisSources);
+      baseBpm = tempoInfo.bpm;
+      firstBeatOffset = tempoInfo.offset;
+      document.getElementById("bpmVal").textContent = baseBpm;
+
+      chordTimeline = detectChordsFromBuffers(analysisSources);
+
+      setupDualSoundTouchEngine();
+      renderMixer();
+      enableControls(true);
+      setStatus(`✅ Llest: ${currentFolderTitle} (${baseBpm} BPM)`);
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ Error carregant els MP3. Revisa la connexió.");
+    }
+  }
+
+  // Doble motor SoundTouch sincronitzat:
+  // 1) stHarmonic -> aplica Pitch + Tempo (veu, baix, guitarra, piano, altres, original)
+  // 2) stDrums -> aplica NOMÉS Tempo (pitch = 0 fix per a la bateria)
+  function setupDualSoundTouchEngine() {
+    if (scriptNode) {
+      scriptNode.disconnect();
+    }
+    const { SoundTouch, SimpleFilter } = window.soundtouch;
+
+    stHarmonic = new SoundTouch();
+    stHarmonic.pitchSemitones = currentPitch;
+    stHarmonic.tempo = currentTempo;
+
+    stDrums = new SoundTouch();
+    stDrums.pitchSemitones = 0; // La bateria mai canvia de tonalitat
+    stDrums.tempo = currentTempo;
+
+    const sampleRate = audioCtx.sampleRate;
+    const maxSamples = Math.max(...stemsData.map(s => s.buffer.length));
+
+    function createGroupSource(filterPredicate) {
+      return {
+        extract: function(target, numFrames, position) {
+          const anySolo = stemsData.some(s => s.soloed);
+          const gains = stemsData.map(s => {
+            if (!filterPredicate(s)) return 0;
+            return anySolo ? (s.soloed ? s.volume : 0) : (s.muted ? 0 : s.volume);
+          });
+
+          for (let i = 0; i < numFrames; i++) {
+            const idx = position + i;
+            if (idx >= maxSamples) return i;
+
+            let sumL = 0, sumR = 0;
+            for (let s = 0; s < stemsData.length; s++) {
+              const g = gains[s];
+              if (g === 0) continue;
+              const buf = stemsData[s].buffer;
+              if (idx < buf.length) {
+                sumL += buf.getChannelData(0)[idx] * g;
+                sumR += (buf.numberOfChannels > 1 ? buf.getChannelData(1)[idx] : buf.getChannelData(0)[idx]) * g;
+              }
+            }
+            target[i * 2] = sumL;
+            target[i * 2 + 1] = sumR;
+          }
+          return numFrames;
+        }
+      };
     }
 
-    songDuration = Math.max(...rawBuffers.map(b => b.buffer.duration));
-    document.getElementById("seekBar").max = songDuration;
-    document.getElementById("timeTotal").textContent = formatTime(songDuration);
+    const filterHarmonic = new SimpleFilter(createGroupSource(s => !s.isDrum), stHarmonic);
+    const filterDrums = new SimpleFilter(createGroupSource(s => s.isDrum), stDrums);
 
-    setStatus("Detectant BPM i acords...");
-    await new Promise(r => setTimeout(r, 40));
+    const bufferSize = 4096;
+    scriptNode = audioCtx.createScriptProcessor(bufferSize, 2, 2);
+    const bufHarm = new Float32Array(bufferSize * 2);
+    const bufDrum = new Float32Array(bufferSize * 2);
 
-    const tempoInfo = detectBpmFromBuffers(rawBuffers);
-    baseBpm = tempoInfo.bpm;
-    firstBeatOffset = tempoInfo.offset;
-    document.getElementById("bpmVal").textContent = baseBpm;
+    scriptNode.onaudioprocess = function(e) {
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.getChannelData(1);
 
-    chordTimeline = detectChordsFromBuffers(rawBuffers);
+      if (!isPlaying) {
+        outL.fill(0);
+        outR.fill(0);
+        return;
+      }
 
-    renderMixer();
-    enableControls(true);
-    setStatus(`✅ Carregada: ${currentFolderTitle} (${baseBpm} BPM)`);
+      const startPos = Math.floor(samplePosition);
+      filterHarmonic.sourcePosition = startPos;
+      filterDrums.sourcePosition = startPos;
+
+      const framesH = filterHarmonic.extract(bufHarm, bufferSize);
+      const framesD = filterDrums.extract(bufDrum, bufferSize);
+      const framesExtracted = Math.max(framesH, framesD);
+
+      for (let i = 0; i < framesExtracted; i++) {
+        const hL = i < framesH ? bufHarm[i * 2] : 0;
+        const hR = i < framesH ? bufHarm[i * 2 + 1] : 0;
+        const dL = i < framesD ? bufDrum[i * 2] : 0;
+        const dR = i < framesD ? bufDrum[i * 2 + 1] : 0;
+        outL[i] = hL + dL;
+        outR[i] = hR + dR;
+      }
+      for (let i = framesExtracted; i < bufferSize; i++) {
+        outL[i] = 0;
+        outR[i] = 0;
+      }
+
+      samplePosition = filterHarmonic.sourcePosition;
+
+      if (samplePosition >= maxSamples) {
+        isPlaying = false;
+        samplePosition = loopA !== null ? loopA * sampleRate : 0;
+        document.getElementById("btnPlay").textContent = "▶️ Play";
+      }
+    };
+
+    scriptNode.connect(audioCtx.destination);
   }
 
-  function initMetronomeSynth() {
-    if (metroSynth) return;
-    metroSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.008,
-      octaves: 2,
-      envelope: { attack: 0.001, decay: 0.06, sustain: 0 }
-    }).toDestination();
-  }
-
-  function playClick(isAccent, time = Tone.now()) {
-    initMetronomeSynth();
-    metroSynth.volume.value = Tone.gainToDb(metroVolume);
-    metroSynth.triggerAttackRelease(isAccent ? "G5" : "C5", "32n", time);
+  function playClick(isAccent) {
+    ensureAudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(isAccent ? 1050 : 750, audioCtx.currentTime);
+    gain.gain.setValueAtTime(metroVolume * 0.6, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.055);
   }
 
   function highlightBeatDot(beatInBar) {
@@ -438,14 +584,14 @@
     `;
     container.appendChild(metroRow);
 
-    players.forEach((p, i) => {
+    stemsData.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = "stem-row";
       row.innerHTML = `
-        <div class="stem-name" title="${p.name}">${p.name}</div>
-        <button id="mute-${i}" class="btn-ms" onclick="toggleMute(${i})">M</button>
-        <button id="solo-${i}" class="btn-ms" onclick="toggleSolo(${i})">S</button>
-        <input type="range" min="0" max="1.2" step="0.02" value="1" oninput="setVolume(${i}, this.value)" />
+        <div class="stem-name ${s.isOriginal ? 'is-original' : ''}" title="${s.name}">${s.name}</div>
+        <button id="mute-${i}" class="btn-ms ${s.muted ? 'muted' : ''}" onclick="toggleMute(${i})">M</button>
+        <button id="solo-${i}" class="btn-ms ${s.soloed ? 'soloed' : ''}" onclick="toggleSolo(${i})">S</button>
+        <input type="range" min="0" max="1.3" step="0.02" value="${s.volume}" oninput="setVolume(${i}, this.value)" />
       `;
       container.appendChild(row);
     });
@@ -465,78 +611,64 @@
     btn.classList.toggle("active-green", countInEnabled);
   }
 
-  function updateMixGains() {
-    const anySolo = players.some(p => p.soloed);
-    players.forEach((p, i) => {
-      document.getElementById(`mute-${i}`).classList.toggle("muted", p.muted);
-      document.getElementById(`solo-${i}`).classList.toggle("soloed", p.soloed);
-      const shouldPlay = anySolo ? p.soloed : !p.muted;
-      p.gain.gain.value = shouldPlay ? p.volume : 0;
+  function updateMixButtons() {
+    stemsData.forEach((s, i) => {
+      document.getElementById(`mute-${i}`).classList.toggle("muted", s.muted);
+      document.getElementById(`solo-${i}`).classList.toggle("soloed", s.soloed);
     });
   }
 
   function toggleMute(i) {
-    players[i].muted = !players[i].muted;
-    if (players[i].muted) players[i].soloed = false;
-    updateMixGains();
+    stemsData[i].muted = !stemsData[i].muted;
+    if (stemsData[i].muted) stemsData[i].soloed = false;
+    updateMixButtons();
   }
 
   function toggleSolo(i) {
-    players[i].soloed = !players[i].soloed;
-    if (players[i].soloed) players[i].muted = false;
-    updateMixGains();
+    stemsData[i].soloed = !stemsData[i].soloed;
+    if (stemsData[i].soloed) stemsData[i].muted = false;
+    updateMixButtons();
   }
 
   function setVolume(i, val) {
-    players[i].volume = parseFloat(val);
-    updateMixGains();
+    stemsData[i].volume = parseFloat(val);
   }
 
-  async function togglePlay() {
-    await Tone.start();
+  function togglePlay() {
+    ensureAudioContext();
     if (isPlaying || isCountingIn) {
       pausePlayback();
     } else {
-      if (countInEnabled) runCountInAndPlay(currentOffset);
-      else startPlayback(currentOffset);
+      if (countInEnabled) runCountInAndPlay();
+      else startPlayback();
     }
   }
 
-  function runCountInAndPlay(targetOffset) {
+  function runCountInAndPlay() {
     isCountingIn = true;
     document.getElementById("btnPlay").textContent = "⏳ 1-2-3-4...";
     const effectiveBpm = baseBpm * currentTempo;
-    const beatSec = 60 / effectiveBpm;
-    const now = Tone.now() + 0.05;
+    const beatMs = (60 / effectiveBpm) * 1000;
 
     for (let i = 0; i < 4; i++) {
-      const clickTime = now + i * beatSec;
-      playClick(i === 0, clickTime);
       setTimeout(() => {
-        if (isCountingIn) {
-          highlightBeatDot(i);
-          document.getElementById("chordCurrent").textContent = i + 1;
-        }
-      }, i * beatSec * 1000);
+        if (!isCountingIn) return;
+        playClick(i === 0);
+        highlightBeatDot(i);
+        document.getElementById("chordCurrent").textContent = i + 1;
+      }, i * beatMs);
     }
 
     setTimeout(() => {
       if (!isCountingIn) return;
       isCountingIn = false;
-      startPlayback(targetOffset);
-    }, 4 * beatSec * 1000);
+      startPlayback();
+    }, 4 * beatMs);
   }
 
-  function startPlayback(offset) {
-    if (players.length === 0) return;
-    const now = Tone.now() + 0.05;
-    players.forEach(p => {
-      p.player.stop();
-      p.player.playbackRate = currentTempo;
-      p.player.start(now, offset);
-    });
-    currentOffset = offset;
-    lastPlayTimestamp = Tone.now();
+  function startPlayback() {
+    if (stemsData.length === 0) return;
+    ensureAudioContext();
     lastPlayedBeatIndex = -1;
     isPlaying = true;
     document.getElementById("btnPlay").textContent = "⏸ Pausa";
@@ -545,13 +677,6 @@
 
   function pausePlayback() {
     isCountingIn = false;
-    if (!isPlaying) {
-      document.getElementById("btnPlay").textContent = "▶️ Play";
-      return;
-    }
-    const elapsed = (Tone.now() - lastPlayTimestamp) * currentTempo;
-    currentOffset = Math.min(songDuration, currentOffset + elapsed);
-    players.forEach(p => p.player.stop());
     isPlaying = false;
     document.getElementById("btnPlay").textContent = "▶️ Play";
     cancelAnimationFrame(animFrameId);
@@ -559,40 +684,37 @@
 
   function stopPlayback() {
     isCountingIn = false;
-    players.forEach(p => p.player.stop());
     isPlaying = false;
-    currentOffset = loopA !== null ? loopA : 0;
+    const startSec = loopA !== null ? loopA : 0;
+    samplePosition = audioCtx ? startSec * audioCtx.sampleRate : 0;
     lastPlayedBeatIndex = -1;
     document.getElementById("btnPlay").textContent = "▶️ Play";
-    document.getElementById("seekBar").value = currentOffset;
-    document.getElementById("timeCurrent").textContent = formatTime(currentOffset);
+    document.getElementById("seekBar").value = startSec;
+    document.getElementById("timeCurrent").textContent = formatTime(startSec);
     cancelAnimationFrame(animFrameId);
-    updateChordDisplay(currentOffset);
+    updateChordDisplay(startSec);
   }
 
   document.getElementById("seekBar").addEventListener("input", (e) => {
     const val = parseFloat(e.target.value);
+    if (audioCtx) samplePosition = val * audioCtx.sampleRate;
     document.getElementById("timeCurrent").textContent = formatTime(val);
     updateChordDisplay(val);
-    if (isPlaying) startPlayback(val);
-    else currentOffset = val;
   });
 
   function changePitch(delta, reset = false) {
     currentPitch = reset ? 0 : Math.max(-12, Math.min(12, currentPitch + delta));
     document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch;
-    if (pitchShiftNode) pitchShiftNode.pitch = currentPitch;
+    // Només modifiquem el pitch del motor harmònic; stDrums es manté a 0
+    if (stHarmonic) stHarmonic.pitchSemitones = currentPitch;
     updateChordDisplay(getCurrentPosition());
   }
 
   function changeTempo(delta, reset = false) {
-    if (isPlaying) {
-      currentOffset = getCurrentPosition();
-      lastPlayTimestamp = Tone.now();
-    }
     currentTempo = reset ? 1.0 : Math.max(0.5, Math.min(1.5, +(currentTempo + delta).toFixed(2)));
     document.getElementById("tempoVal").textContent = Math.round(currentTempo * 100) + "%";
-    players.forEach(p => p.player.playbackRate = currentTempo);
+    if (stHarmonic) stHarmonic.tempo = currentTempo;
+    if (stDrums) stDrums.tempo = currentTempo;
   }
 
   function changeBpm(delta) {
@@ -634,21 +756,17 @@
   }
 
   function getCurrentPosition() {
-    if (!isPlaying) return currentOffset;
-    return currentOffset + (Tone.now() - lastPlayTimestamp) * currentTempo;
+    if (!audioCtx) return 0;
+    return samplePosition / audioCtx.sampleRate;
   }
 
   function updateLoopUI() {
     if (!isPlaying) return;
-    let pos = getCurrentPosition();
+    const pos = getCurrentPosition();
 
     if (loopA !== null && loopB !== null && pos >= loopB) {
-      startPlayback(loopA);
-      return;
-    }
-    if (pos >= songDuration) {
-      stopPlayback();
-      return;
+      samplePosition = loopA * audioCtx.sampleRate;
+      lastPlayedBeatIndex = -1;
     }
 
     const beatDuration = 60 / baseBpm;
@@ -680,8 +798,8 @@
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   }
 
-  function detectBpmFromBuffers(rawBuffers) {
-    const drumStem = rawBuffers.find(b => /drum|bat|perc/i.test(b.name)) || rawBuffers[0];
+  function detectBpmFromBuffers(sources) {
+    const drumStem = sources.find(b => b.isDrum) || sources[0];
     const buffer = drumStem.buffer;
     const data = buffer.getChannelData(0);
     const sr = buffer.sampleRate;
@@ -712,84 +830,4 @@
 
     const threshold = Math.max(...onset) * 0.35;
     let firstIdx = onset.findIndex(v => v > threshold);
-    const offset = firstIdx > 0 ? (firstIdx * 0.01) % (60 / bestBpm) : 0;
-
-    return { bpm: bestBpm, offset };
-  }
-
-  function detectChordsFromBuffers(rawBuffers) {
-    const harmonic = rawBuffers.filter(b => !/drum|bat|perc|voc|veu|sing/i.test(b.name));
-    const sources = harmonic.length > 0 ? harmonic : rawBuffers;
-
-    const sampleRate = sources[0].buffer.sampleRate;
-    const length = sources[0].buffer.length;
-    const stepSec = 0.5;
-    const stepSamples = Math.floor(sampleRate * stepSec);
-    const winSize = 4096;
-
-    const targetBins = [];
-    for (let midi = 36; midi <= 83; midi++) {
-      const freq = 440 * Math.pow(2, (midi - 69) / 12);
-      targetBins.push({ pc: midi % 12, omega: (2 * Math.PI * freq) / sampleRate });
-    }
-
-    const timeline = [];
-    let lastChordKey = "";
-
-    for (let offset = 0; offset + winSize < length; offset += stepSamples) {
-      const chroma = new Float32Array(12);
-      const frame = new Float32Array(winSize);
-      for (const src of sources) {
-        const ch = src.buffer.getChannelData(0);
-        for (let i = 0; i < winSize; i++) frame[i] += ch[offset + i];
-      }
-
-      for (const bin of targetBins) {
-        const coeff = 2 * Math.cos(bin.omega);
-        let s0 = 0, s1 = 0, s2 = 0;
-        for (let i = 0; i < winSize; i++) {
-          s0 = frame[i] + coeff * s1 - s2;
-          s2 = s1;
-          s1 = s0;
-        }
-        const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
-        chroma[bin.pc] += Math.sqrt(Math.max(0, power));
-      }
-
-      let bestScore = -1, bestRoot = 0, bestQuality = "";
-      for (let r = 0; r < 12; r++) {
-        const majScore = chroma[r] * 1.2 + chroma[(r + 4) % 12] + chroma[(r + 7) % 12] - chroma[(r + 3) % 12] * 0.5;
-        const minScore = chroma[r] * 1.2 + chroma[(r + 3) % 12] + chroma[(r + 7) % 12] - chroma[(r + 4) % 12] * 0.5;
-
-        if (majScore > bestScore) { bestScore = majScore; bestRoot = r; bestQuality = ""; }
-        if (minScore > bestScore) { bestScore = minScore; bestRoot = r; bestQuality = "m"; }
-      }
-
-      const key = `${bestRoot}${bestQuality}`;
-      if (key !== lastChordKey && bestScore > 15) {
-        timeline.push({ time: offset / sampleRate, root: bestRoot, quality: bestQuality });
-        lastChordKey = key;
-      }
-    }
-    return timeline;
-  }
-
-  function formatTransposedChord(chordObj) {
-    if (!chordObj) return "--";
-    const transposedRoot = (chordObj.root + currentPitch + 120) % 12;
-    return NOTES[transposedRoot] + chordObj.quality;
-  }
-
-  function updateChordDisplay(pos) {
-    if (chordTimeline.length === 0) return;
-    let idx = 0;
-    for (let i = 0; i < chordTimeline.length; i++) {
-      if (chordTimeline[i].time <= pos) idx = i;
-      else break;
-    }
-    document.getElementById("chordCurrent").textContent = formatTransposedChord(chordTimeline[idx]);
-    document.getElementById("chordNext").textContent = formatTransposedChord(chordTimeline[idx + 1]);
-  }
-</script>
-</body>
-</html>
+    const offset
