@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>StemStudio Personal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --primary: #38bdf8;
+      --accent: #f43f5e;
+      --solo: #eab308;
+      --green: #10b981;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); padding: 14px; padding-bottom: 92px;
+    }
+    h1 { font-size: 1.2rem; margin: 0 0 12px 0; display: flex; justify-content: space-between; align-items: center; }
+    .card { background: var(--surface); border-radius: 12px; padding: 13px; margin-bottom: 12px; }
+    input, select, button {
+      font-size: 0.92rem; border-radius: 8px; border: 1px solid var(--surface-light);
+      background: var(--bg); color: var(--text); padding: 9px 11px;
+    }
+    button { background: var(--primary); color: #0f172a; font-weight: 700; border: none; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary { background: var(--surface-light); color: var(--text); font-weight: 600; }
+    button.active-loop { background: var(--solo); color: #000; }
+    button.active-green { background: var(--green); color: #000; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .grow { flex: 1; min-width: 170px; }
+
+    /* Visor d'acords */
+    .chord-box {
+      display: flex; justify-content: space-around; align-items: center;
+      background: #020617; border-radius: 10px; padding: 14px; text-align: center; position: relative;
+    }
+    .chord-current { font-size: 2.5rem; font-weight: 800; color: var(--primary); min-width: 110px; }
+    .chord-next { font-size: 1.35rem; font-weight: 600; color: var(--muted); min-width: 80px; }
+    .chord-label { font-size: 0.68rem; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; }
+    .beat-dots { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-light); transition: 0.08s; }
+    .dot.active { background: var(--primary); transform: scale(1.3); }
+    .dot.accent { background: var(--accent); transform: scale(1.4); }
+
+    /* Barra de progrés */
+    .timeline-wrap { margin: 10px 0; }
+    input[type="range"] { width: 100%; accent-color: var(--primary); padding: 0; }
+    .time-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+
+    /* Controls de To, Tempo i BPM */
+    .controls-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .control-item { background: var(--bg); padding: 8px 6px; border-radius: 8px; text-align: center; }
+    .control-val { font-size: 1.1rem; font-weight: 700; margin: 4px 0; color: var(--primary); }
+    .mini-btns { display: flex; justify-content: center; gap: 4px; }
+    .mini-btns button { padding: 5px 8px; font-size: 0.82rem; }
+
+    /* Mesclador de Stems */
+    .stem-row {
+      display: grid; grid-template-columns: 95px 38px 38px 1fr;
+      gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-light);
+    }
+    .stem-row:last-child { border-bottom: none; }
+    .stem-name { font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-ms { padding: 7px 0; font-size: 0.78rem; background: var(--surface-light); color: var(--text); }
+    .btn-ms.muted { background: var(--accent); color: #fff; }
+    .btn-ms.soloed { background: var(--solo); color: #000; }
+
+    /* Barra inferior fixa */
+    .transport-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #020617;
+      border-top: 1px solid var(--surface-light); padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px; z-index: 50;
+    }
+    .status { font-size: 0.82rem; color: var(--primary); margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>
+    <span>🎛️ StemStudio</span>
+    <button class="secondary" style="padding:6px 10px;font-size:0.8rem" onclick="toggleConfig()">⚙️ Drive URL</button>
+  </h1>
+
+  <!-- Configuració URL Apps Script -->
+  <div id="configCard" class="card">
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:6px">Enganxa l'URL del teu Google Apps Script (/exec):</div>
+    <div class="row">
+      <input id="scriptUrlInput" class="grow" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button onclick="saveUrlAndFetch()">Connectar</button>
+    </div>
+  </div>
+
+  <!-- Selector de Cançons -->
+  <div class="card">
+    <div class="row">
+      <select id="songSelect" class="grow" disabled>
+        <option value="">Connecta primer el teu Drive...</option>
+      </select>
+      <button id="loadSongBtn" onclick="loadSelectedSong()" disabled>Carregar</button>
+    </div>
+    <div id="statusText" class="status"></div>
+  </div>
+
+  <!-- Visor d'Acords i Pulsació -->
+  <div class="card">
+    <div class="chord-box">
+      <div>
+        <div class="chord-label">Acord Actual</div>
+        <div id="chordCurrent" class="chord-current">--</div>
+      </div>
+      <div>
+        <div class="chord-label">Següent</div>
+        <div id="chordNext" class="chord-next">--</div>
+      </div>
+    </div>
+
+    <div class="beat-dots">
+      <div id="dot-0" class="dot"></div>
+      <div id="dot-1" class="dot"></div>
+      <div id="dot-2" class="dot"></div>
+      <div id="dot-3" class="dot"></div>
+    </div>
+
+    <div class="timeline-wrap">
+      <input id="seekBar" type="range" min="0" max="100" value="0" step="0.1" disabled />
+      <div class="time-labels">
+        <span id="timeCurrent">0:00</span>
+        <span id="loopIndicator" style="color:var(--solo);font-weight:bold"></span>
+        <span id="timeTotal">0:00</span>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:center">
+      <button id="btnLoopA" class="secondary" onclick="setLoopPoint('A')" disabled>Punt A</button>
+      <button id="btnLoopB" class="secondary" onclick="setLoopPoint('B')" disabled>Punt B</button>
+      <button id="btnLoopClear" class="secondary" onclick="clearLoop()" disabled>Netejar</button>
+    </div>
+  </div>
+
+  <!-- Controls de Tonalitat, Tempo i BPM -->
+  <div class="card">
+    <div class="controls-grid">
+      <div class="control-item">
+        <div class="chord-label">Tonalitat</div>
+        <div id="pitchVal" class="control-val">0</div>
+        <div class="mini-btns">
+          <button class="secondary" onclick="changePitch(-1)">-1</button>
+          <button class="secondary" onclick="changePitch(0, true)">0</button>
+          <button class="secondary" onclick="changePitch(1)">+1</button>
+        </div>
+      </div>
+      <div class="control-item">
+        <div class="chord-label">Velocitat</div>
+        <div id="tempoVal" class="control-val">100%</div>
+        <div class="mini-btns">
+          <button class="secondary" onclick="changeTempo(-0.05)">-5%</button>
+          <button class="secondary" onclick="changeTempo(1, true)">100%</button>
+          <button class="secondary" onclick="changeTempo(0.05)">+5%</button>
+        </div>
+      </div>
+      <div class="control-item">
+        <div class="chord-label">BPM Base</div>
+        <div id="bpmVal" class="control-val">120</div>
+        <div class="mini-btns">
+          <button class="secondary" onclick="changeBpm(-1)">-1</button>
+          <button class="secondary" onclick="tapBpm()">Tap</button>
+          <button class="secondary" onclick="changeBpm(1)">+1</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mesclador de Stems + Metrònom -->
+  <div class="card">
+    <div class="chord-label" style="margin-bottom:6px">Mesclador de Pistes i Claqueta</div>
+    <div id="mixerContainer">
+      <div style="color:var(--muted);font-size:0.9rem;text-align:center;padding:16px">Carrega una cançó per veure els stems</div>
+    </div>
+  </div>
+
+  <!-- Barra de Reproducció Inferior -->
+  <div class="transport-bar">
+    <button class="secondary" onclick="stopPlayback()" id="btnStop" disabled>⏹</button>
+    <button class="secondary" onclick="toggleCountIn()" id="btnCountIn">1-2-3-4 Off</button>
+    <button onclick="togglePlay()" id="btnPlay" style="flex:1;padding:12px" disabled>▶️ Play</button>
+  </div>
+
+<script>
+  let songsList = [];
+  let players = [];
+  let pitchShiftNode = null;
+  let isPlaying = false;
+  let isCountingIn = false;
+  let countInEnabled = false;
+  let songDuration = 0;
+  let currentOffset = 0;
+  let lastPlayTimestamp = 0;
+  let currentPitch = 0;
+  let currentTempo = 1.0;
+  let baseBpm = 120;
+  let firstBeatOffset = 0;
+  let loopA = null, loopB = null;
+  let chordTimeline = [];
+  let animFrameId = null;
+
+  // Variables del Metrònom
+  let metroEnabled = false;
+  let metroVolume = 0.7;
+  let lastPlayedBeatIndex = -1;
+  let metroSynth = null;
+  let tapTimes = [];
+
+  const NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
+
+  window.onload = () => {
+    const saved = localStorage.getItem("stemstudio_url");
+    if (saved) {
+      document.getElementById("scriptUrlInput").value = saved;
+      document.getElementById("configCard").style.display = "none";
+      fetchSongs(saved);
+    }
+  };
+
+  function toggleConfig() {
+    const el = document.getElementById("configCard");
+    el.style.display = el.style.display === "none" ? "block" : "none";
+  }
+
+  function setStatus(msg) {
+    document.get
