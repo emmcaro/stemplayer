@@ -214,6 +214,8 @@
   var keepAliveNode = null;
   var stHarmonic = null;
   var stDrums = null;
+  var filterHarmonic = null;
+  var filterDrums = null;
   var stemsData = [];
 
   var folderHistory = [];
@@ -225,6 +227,7 @@
   var countInEnabled = false;
   var songDuration = 0;
   var samplePosition = 0;
+  var maxSamples = 0;
   var currentPitch = 0;
   var currentTempo = 1.0;
   var baseBpm = 120;
@@ -323,7 +326,6 @@
       document.getElementById("currentFolderName").textContent = "📁 " + data.currentName;
       currentFolderTitle = data.currentName;
 
-      // Només ens quedem amb els MP3 (ignorem WAV si l'script antic en tornés cap)
       currentFolderStems = (data.stems || []).filter(function(s) {
         return !/\.wav$/i.test(s.name);
       });
@@ -363,39 +365,28 @@
     browseFolder(prevId, true);
   }
 
-  // Detecta el nom de l'instrument sense silenciar per error cap stem
+  // Retalla el prefix comú i marca com a "Original" NOMÉS l'arxiu que no té cap sufix després del prefix comú
   function classifyTrackNames(names) {
-    var INSTRUMENT_REGEX = /(vocals?|veu|voice|drums?|bateria|bat|perc|bass|baix|guitars?|guitarra|guit|piano|keys?|teclat|other|altres|altre|synth)/i;
+    if (names.length <= 1) {
+      return names.map(function(n) { return { displayName: n, isOriginal: false }; });
+    }
 
-    // 1. Determina quines pistes són instruments i quina és l'MP3 original
-    var flags = names.map(function(name) {
-      var match = name.match(INSTRUMENT_REGEX);
-      return {
-        hasInstrument: !!match,
-        matchedWord: match ? match[0] : ""
-      };
-    });
-
-    var anyHasInstrument = flags.some(function(f) { return f.hasInstrument; });
-
-    // 2. Calcula el prefix comú només entre els stems d'instruments per deixar el nom net
-    var stemNames = names.filter(function(_, idx) { return flags[idx].hasInstrument; });
-    var prefix = stemNames.length > 1 ? stemNames[0] : "";
-    for (var i = 1; i < stemNames.length; i++) {
-      while (stemNames[i].indexOf(prefix) !== 0) {
+    var prefix = names[0];
+    for (var i = 1; i < names.length; i++) {
+      while (names[i].toLowerCase().indexOf(prefix.toLowerCase()) !== 0) {
         prefix = prefix.substring(0, prefix.length - 1);
         if (prefix === "") break;
       }
     }
 
-    return names.map(function(name, idx) {
-      var isOrig = anyHasInstrument && !flags[idx].hasInstrument;
-      if (isOrig) {
-        return { displayName: "Original", isOriginal: true };
-      }
-      var clean = prefix ? name.slice(prefix.length).replace(/^[\s\-_.:()\[\]]+/, "").trim() : "";
-      if (!clean) clean = flags[idx].matchedWord || name;
-      return { displayName: clean, isOriginal: false };
+    return names.map(function(name) {
+      var clean = name.slice(prefix.length).replace(/^[\s\-_.:()\[\]]+/, "").trim();
+      // Només és l'original si el seu nom era exactament el prefix comú (no té cap instrument al darrere)
+      var isOrig = (clean === "" && prefix.length > 2);
+      return {
+        displayName: isOrig ? "Original" : (clean || name),
+        isOriginal: isOrig
+      };
     });
   }
 
@@ -444,6 +435,9 @@
       });
 
       songDuration = Math.max.apply(null, stemsData.map(function(s) { return s.buffer.duration; }));
+      maxSamples = Math.max.apply(null, stemsData.map(function(s) { return s.buffer.length; }));
+      samplePosition = 0;
+
       document.getElementById("seekBar").max = songDuration;
       document.getElementById("timeTotal").textContent = formatTime(songDuration);
 
@@ -470,12 +464,16 @@
   }
 
   function setupDualSoundTouchEngine() {
-    if (scriptNode) scriptNode.disconnect();
-    if (keepAliveNode) keepAliveNode.disconnect();
+    if (scriptNode) {
+      try { scriptNode.disconnect(); } catch (e) {}
+    }
+    if (keepAliveNode) {
+      try { keepAliveNode.stop(); keepAliveNode.disconnect(); } catch (e) {}
+    }
 
     var ST = window.soundtouch;
-    if (!ST) {
-      setStatus("⚠️ No s'ha carregat el motor d'àudio SoundTouch.");
+    if (!ST || !ST.SoundTouch || !ST.SimpleFilter) {
+      setStatus("⚠️ Error carregant la llibreria SoundTouch.");
       return;
     }
 
@@ -487,9 +485,6 @@
     stDrums.pitchSemitones = 0;
     stDrums.tempo = currentTempo;
 
-    var sampleRate = audioCtx.sampleRate;
-    var maxSamples = Math.max.apply(null, stemsData.map(function(s) { return s.buffer.length; }));
-
     function createGroupSource(predicate) {
       return {
         extract: function(target, numFrames, position) {
@@ -499,8 +494,9 @@
             return anySolo ? (s.soloed ? s.volume : 0) : (s.muted ? 0 : s.volume);
           });
 
+          var pos = Math.floor(position);
           for (var i = 0; i < numFrames; i++) {
-            var idx = position + i;
+            var idx = pos + i;
             if (idx >= maxSamples) return i;
             var sumL = 0, sumR = 0;
             for (var s = 0; s < stemsData.length; s++) {
@@ -520,16 +516,15 @@
       };
     }
 
-    var filterHarmonic = new ST.SimpleFilter(createGroupSource(function(s) { return !s.isDrum; }), stHarmonic);
-    var filterDrums = new ST.SimpleFilter(createGroupSource(function(s) { return s.isDrum; }), stDrums);
+    filterHarmonic = new ST.SimpleFilter(createGroupSource(function(s) { return !s.isDrum; }), stHarmonic);
+    filterDrums = new ST.SimpleFilter(createGroupSource(function(s) { return s.isDrum; }), stDrums);
 
     var bufferSize = 4096;
     scriptNode = audioCtx.createScriptProcessor(bufferSize, 2, 2);
     var bufHarm = new Float32Array(bufferSize * 2);
     var bufDrum = new Float32Array(bufferSize * 2);
 
-    // Font silenciosa connectada a l'entrada perquè iOS Safari mai adormi el ScriptProcessor
-    var silentBuffer = audioCtx.createBuffer(2, bufferSize, sampleRate);
+    var silentBuffer = audioCtx.createBuffer(2, bufferSize, audioCtx.sampleRate);
     keepAliveNode = audioCtx.createBufferSource();
     keepAliveNode.buffer = silentBuffer;
     keepAliveNode.loop = true;
@@ -540,35 +535,41 @@
       var outL = e.outputBuffer.getChannelData(0);
       var outR = e.outputBuffer.getChannelData(1);
 
-      if (!isPlaying) {
+      if (!isPlaying || maxSamples === 0) {
         outL.fill(0);
         outR.fill(0);
         return;
       }
 
-      var startPos = Math.floor(samplePosition);
-      filterHarmonic.sourcePosition = startPos;
-      filterDrums.sourcePosition = startPos;
+      try {
+        var currentSample = Math.floor(samplePosition);
+        filterHarmonic.sourcePosition = currentSample;
+        filterDrums.sourcePosition = currentSample;
 
-      var framesH = filterHarmonic.extract(bufHarm, bufferSize);
-      var framesD = filterDrums.extract(bufDrum, bufferSize);
-      var framesExtracted = Math.max(framesH, framesD);
+        var framesH = filterHarmonic.extract(bufHarm, bufferSize);
+        var framesD = filterDrums.extract(bufDrum, bufferSize);
+        var framesExtracted = Math.max(framesH, framesD);
 
-      for (var i = 0; i < framesExtracted; i++) {
-        outL[i] = (i < framesH ? bufHarm[i * 2] : 0) + (i < framesD ? bufDrum[i * 2] : 0);
-        outR[i] = (i < framesH ? bufHarm[i * 2 + 1] : 0) + (i < framesD ? bufDrum[i * 2 + 1] : 0);
-      }
-      for (var j = framesExtracted; j < bufferSize; j++) {
-        outL[j] = 0;
-        outR[j] = 0;
-      }
+        for (var i = 0; i < framesExtracted; i++) {
+          outL[i] = (i < framesH ? bufHarm[i * 2] : 0) + (i < framesD ? bufDrum[i * 2] : 0);
+          outR[i] = (i < framesH ? bufHarm[i * 2 + 1] : 0) + (i < framesD ? bufDrum[i * 2 + 1] : 0);
+        }
+        for (var j = framesExtracted; j < bufferSize; j++) {
+          outL[j] = 0;
+          outR[j] = 0;
+        }
 
-      samplePosition = Math.max(filterHarmonic.sourcePosition, filterDrums.sourcePosition);
+        // Avancem el rellotge manualment segons el tempo per garantir que mai es congeli
+        samplePosition += bufferSize * currentTempo;
 
-      if (samplePosition >= maxSamples) {
+        if (samplePosition >= maxSamples) {
+          isPlaying = false;
+          samplePosition = loopA !== null ? loopA * audioCtx.sampleRate : 0;
+          document.getElementById("btnPlay").textContent = "▶️ Play";
+        }
+      } catch (err) {
+        setStatus("Error d'àudio: " + err.message);
         isPlaying = false;
-        samplePosition = loopA !== null ? loopA * sampleRate : 0;
-        document.getElementById("btnPlay").textContent = "▶️ Play";
       }
     };
 
