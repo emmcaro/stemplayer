@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>StemStudio Personal</title>
+  <title>StemStudio Drive</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <style>
     :root {
@@ -34,14 +34,21 @@
     button.active-loop { background: var(--solo); color: #000; }
     button.active-green { background: var(--green); color: #000; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .grow { flex: 1; min-width: 170px; }
 
-    /* Botó de càrrega d'arxius */
-    .upload-btn {
-      display: block; width: 100%; text-align: center; padding: 14px;
-      background: var(--primary); color: #0f172a; font-weight: 800;
-      border-radius: 10px; cursor: pointer; font-size: 1rem;
+    /* Explorador de Carpetes Drive */
+    .browser-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+    .folder-path { font-weight: 700; color: var(--primary); font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .folder-list { max-height: 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+    .folder-item {
+      background: var(--bg); padding: 10px 12px; border-radius: 8px; display: flex;
+      justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid var(--surface-light);
     }
-    input[type="file"] { display: none; }
+    .folder-item:active { background: var(--surface-light); }
+    .stems-ready-box {
+      background: #064e3b; border: 1px solid var(--green); padding: 10px; border-radius: 8px;
+      margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
 
     /* Visor d'acords */
     .chord-box {
@@ -85,18 +92,42 @@
       border-top: 1px solid var(--surface-light); padding: 10px 14px;
       display: flex; justify-content: space-between; align-items: center; gap: 8px; z-index: 50;
     }
-    .status { font-size: 0.82rem; color: var(--primary); margin-top: 8px; text-align: center; }
+    .status { font-size: 0.82rem; color: var(--primary); margin-top: 6px; }
   </style>
 </head>
 <body>
 
-  <h1>🎛️ StemStudio</h1>
+  <h1>
+    <span>🎛️ StemStudio Drive</span>
+    <button class="secondary" style="padding:6px 10px;font-size:0.8rem" onclick="toggleConfig()">⚙️ Drive URL</button>
+  </h1>
 
-  <!-- Selector d'arxius directe -->
+  <!-- Configuració URL Apps Script -->
+  <div id="configCard" class="card">
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:6px">Enganxa l'URL del teu Google Apps Script (/exec):</div>
+    <div class="row">
+      <input id="scriptUrlInput" class="grow" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button onclick="saveUrlAndBrowse()">Connectar</button>
+    </div>
+  </div>
+
+  <!-- Explorador de Carpetes de Google Drive -->
   <div class="card">
-    <label for="fileInput" class="upload-btn">📂 Seleccionar els Stems (Drive / Fitxers)</label>
-    <input id="fileInput" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg" multiple onchange="handleFilesSelected(event)" />
-    <div id="statusText" class="status">Selecciona tots els stems d'una cançó alhora</div>
+    <div class="browser-header">
+      <button id="btnBack" class="secondary" style="padding:6px 10px" onclick="goBackFolder()" disabled>⬅️ Enrere</button>
+      <div id="currentFolderName" class="folder-path">Google Drive</div>
+      <button class="secondary" style="padding:6px 10px" onclick="browseFolder('root')" title="Anar a l'inici">🏠</button>
+    </div>
+
+    <div id="stemsReadyBox" class="stems-ready-box" style="display:none">
+      <span id="stemsReadyLabel" style="font-size:0.88rem;font-weight:700">6 stems trobats</span>
+      <button class="active-green" style="padding:7px 12px" onclick="loadCurrentFolderStems()">Carregar</button>
+    </div>
+
+    <div id="folderList" class="folder-list">
+      <div style="color:var(--muted);font-size:0.85rem;padding:8px">Connecta l'URL del teu Drive per navegar per les carpetes.</div>
+    </div>
+    <div id="statusText" class="status"></div>
   </div>
 
   <!-- Visor d'Acords i Pulsació -->
@@ -172,7 +203,7 @@
   <div class="card">
     <div class="chord-label" style="margin-bottom:6px">Mesclador de Pistes i Claqueta</div>
     <div id="mixerContainer">
-      <div style="color:var(--muted);font-size:0.9rem;text-align:center;padding:16px">Carrega els stems per veure el mesclador</div>
+      <div style="color:var(--muted);font-size:0.9rem;text-align:center;padding:16px">Navega fins a una carpeta amb stems i prem Carregar</div>
     </div>
   </div>
 
@@ -184,6 +215,10 @@
   </div>
 
 <script>
+  let folderHistory = [];
+  let currentFolderStems = [];
+  let currentFolderTitle = "";
+
   let players = [];
   let pitchShiftNode = null;
   let isPlaying = false;
@@ -208,39 +243,138 @@
 
   const NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
 
+  window.onload = () => {
+    const saved = localStorage.getItem("stemstudio_url");
+    if (saved) {
+      document.getElementById("scriptUrlInput").value = saved;
+      document.getElementById("configCard").style.display = "none";
+      browseFolder("root");
+    }
+  };
+
+  function toggleConfig() {
+    const el = document.getElementById("configCard");
+    el.style.display = el.style.display === "none" ? "block" : "none";
+  }
+
   function setStatus(msg) {
     document.getElementById("statusText").textContent = msg;
   }
 
-  function initMetronomeSynth() {
-    if (metroSynth) return;
-    metroSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.008,
-      octaves: 2,
-      envelope: { attack: 0.001, decay: 0.06, sustain: 0 }
+  async function saveUrlAndBrowse() {
+    const url = document.getElementById("scriptUrlInput").value.trim().split("?")[0];
+    if (!url) return alert("Introdueix l'URL del script.");
+    localStorage.setItem("stemstudio_url", url);
+    document.getElementById("configCard").style.display = "none";
+    folderHistory = [];
+    await browseFolder("root");
+  }
+
+  async function browseFolder(folderId, isGoingBack = false) {
+    const url = localStorage.getItem("stemstudio_url");
+    if (!url) return;
+
+    setStatus("Obrint carpeta...");
+    try {
+      const res = await fetch(`${url}?action=browse&folderId=${encodeURIComponent(folderId)}`, {
+        method: "GET",
+        redirect: "follow"
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setStatus("⚠️ Error: " + data.error);
+        return;
+      }
+
+      if (!isGoingBack) {
+        if (folderId === "root") folderHistory = ["root"];
+        else if (folderHistory[folderHistory.length - 1] !== folderId) folderHistory.push(folderId);
+      }
+
+      document.getElementById("btnBack").disabled = folderHistory.length <= 1;
+      document.getElementById("currentFolderName").textContent = `📁 ${data.currentName}`;
+      currentFolderTitle = data.currentName;
+      currentFolderStems = data.stems || [];
+
+      // Mostra el botó verd si hi ha stems dins aquesta carpeta
+      const readyBox = document.getElementById("stemsReadyBox");
+      if (currentFolderStems.length > 0) {
+        readyBox.style.display = "flex";
+        document.getElementById("stemsReadyLabel").textContent = `🎵 ${currentFolderStems.length} stems trobats aquí`;
+      } else {
+        readyBox.style.display = "none";
+      }
+
+      // Llista les subcarpetes
+      const listEl = document.getElementById("folderList");
+      listEl.innerHTML = "";
+      if (data.folders.length === 0 && currentFolderStems.length === 0) {
+        listEl.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:8px">Carpeta buida</div>`;
+      } else {
+        data.folders.forEach(f => {
+          const item = document.createElement("div");
+          item.className = "folder-item";
+          item.innerHTML = `<span>📁 ${f.name}</span><span style="color:var(--muted)">›</span>`;
+          item.onclick = () => browseFolder(f.id);
+          listEl.appendChild(item);
+        });
+      }
+      setStatus("");
+    } catch (e) {
+      setStatus("❌ Error connectant amb Drive. Revisa l'URL i els permisos.");
+      document.getElementById("configCard").style.display = "block";
+    }
+  }
+
+  function goBackFolder() {
+    if (folderHistory.length <= 1) return;
+    folderHistory.pop();
+    const prevId = folderHistory[folderHistory.length - 1];
+    browseFolder(prevId, true);
+  }
+
+  async function loadCurrentFolderStems() {
+    if (currentFolderStems.length === 0) return;
+    await Tone.start();
+    stopPlayback();
+    clearLoop();
+
+    const url = localStorage.getItem("stemstudio_url");
+
+    players.forEach(p => { p.player.dispose(); p.gain.dispose(); });
+    players = [];
+    if (pitchShiftNode) pitchShiftNode.dispose();
+
+    pitchShiftNode = new Tone.PitchShift({
+      pitch: currentPitch,
+      windowSize: 0.1,
+      delayTime: 0,
+      feedback: 0
     }).toDestination();
-  }
 
-  function playClick(isAccent, time = Tone.now()) {
-    initMetronomeSynth();
-    metroSynth.volume.value = Tone.gainToDb(metroVolume);
-    metroSynth.triggerAttackRelease(isAccent ? "G5" : "C5", "32n", time);
-  }
+    const rawBuffers = [];
 
-  function highlightBeatDot(beatInBar) {
-    for (let i = 0; i < 4; i++) {
-      const dot = document.getElementById(`dot-${i}`); dot.classList.remove("active", "accent"); if (i === beatInBar) { dot.classList.add(i === 0 ? "accent" : "active"); } } }  async function handleFilesSelected(event) { const files = Array.from(event.target.files); if (files.length === 0) return;  await Tone.start(); stopPlayback(); clearLoop();  // Ordena alfabèticament perquè sempre apareguin en el mateix ordre files.sort((a, b) => a.name.localeCompare(b.name));  players.forEach(p => { p.player.dispose(); p.gain.dispose(); }); players = []; if (pitchShiftNode) pitchShiftNode.dispose();  pitchShiftNode = new Tone.PitchShift({ pitch: currentPitch, windowSize: 0.1, delayTime: 0, feedback: 0 }).toDestination();  const rawBuffers = [];  for (let i = 0; i < files.length; i++) { const file = files[i]; const cleanName = file.name.replace(/\.[^/.]+$/, ""); setStatus(`Carregant (${i + 1}/${files.length}):${cleanName}...`);
+    for (let i = 0; i < currentFolderStems.length; i++) {
+      const stem = currentFolderStems[i];
+      setStatus(`Descarregant (${i + 1}/${currentFolderStems.length}): ${stem.name}...`);
 
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await Tone.context.decodeAudioData(arrayBuffer);
-      rawBuffers.push({ name: cleanName, buffer: audioBuffer });
+      const res = await fetch(`${url}?action=audio&fileId=${stem.id}`, { redirect: "follow" });
+      const json = await res.json();
+
+      const binary = atob(json.data);
+      const bytes = new Uint8Array(binary.length);
+      for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+
+      const audioBuffer = await Tone.context.decodeAudioData(bytes.buffer);
+      rawBuffers.push({ name: stem.name, buffer: audioBuffer });
 
       const gainNode = new Tone.Gain(1).connect(pitchShiftNode);
       const player = new Tone.Player(audioBuffer).connect(gainNode);
       player.playbackRate = currentTempo;
 
       players.push({
-        name: cleanName,
+        name: stem.name,
         player,
         gain: gainNode,
         muted: false,
@@ -265,8 +399,30 @@
 
     renderMixer();
     enableControls(true);
-    setStatus(`✅ ${files.length} pistes carregades (${baseBpm} BPM)`);
-    event.target.value = ""; // Permet tornar a triar la mateixa carpeta si cal
+    setStatus(`✅ Carregada: ${currentFolderTitle} (${baseBpm} BPM)`);
+  }
+
+  function initMetronomeSynth() {
+    if (metroSynth) return;
+    metroSynth = new Tone.MembraneSynth({
+      pitchDecay: 0.008,
+      octaves: 2,
+      envelope: { attack: 0.001, decay: 0.06, sustain: 0 }
+    }).toDestination();
+  }
+
+  function playClick(isAccent, time = Tone.now()) {
+    initMetronomeSynth();
+    metroSynth.volume.value = Tone.gainToDb(metroVolume);
+    metroSynth.triggerAttackRelease(isAccent ? "G5" : "C5", "32n", time);
+  }
+
+  function highlightBeatDot(beatInBar) {
+    for (let i = 0; i < 4; i++) {
+      const dot = document.getElementById(`dot-${i}`);
+      dot.classList.remove("active", "accent");
+      if (i === beatInBar) dot.classList.add(i === 0 ? "accent" : "active");
+    }
   }
 
   function renderMixer() {
@@ -277,4 +433,363 @@
     metroRow.className = "stem-row";
     metroRow.innerHTML = `
       <div class="stem-name" style="color:var(--primary)">⏱️ Metrònom</div>
-      <button id="metroToggleBtn" class="btn-ms ${metroEnabled ? 'soloed' : ''}" style="grid-column: span 2" onclick="toggleMetronome()">${metroEnabled ? 'ON' :
+      <button id="metroToggleBtn" class="btn-ms ${metroEnabled ? 'soloed' : ''}" style="grid-column: span 2" onclick="toggleMetronome()">${metroEnabled ? 'ON' : 'OFF'}</button>
+      <input type="range" min="0" max="1" step="0.05" value="${metroVolume}" oninput="metroVolume = parseFloat(this.value)" />
+    `;
+    container.appendChild(metroRow);
+
+    players.forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "stem-row";
+      row.innerHTML = `
+        <div class="stem-name" title="${p.name}">${p.name}</div>
+        <button id="mute-${i}" class="btn-ms" onclick="toggleMute(${i})">M</button>
+        <button id="solo-${i}" class="btn-ms" onclick="toggleSolo(${i})">S</button>
+        <input type="range" min="0" max="1.2" step="0.02" value="1" oninput="setVolume(${i}, this.value)" />
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  function toggleMetronome() {
+    metroEnabled = !metroEnabled;
+    const btn = document.getElementById("metroToggleBtn");
+    btn.textContent = metroEnabled ? "ON" : "OFF";
+    btn.classList.toggle("soloed", metroEnabled);
+  }
+
+  function toggleCountIn() {
+    countInEnabled = !countInEnabled;
+    const btn = document.getElementById("btnCountIn");
+    btn.textContent = countInEnabled ? "1-2-3-4 On" : "1-2-3-4 Off";
+    btn.classList.toggle("active-green", countInEnabled);
+  }
+
+  function updateMixGains() {
+    const anySolo = players.some(p => p.soloed);
+    players.forEach((p, i) => {
+      document.getElementById(`mute-${i}`).classList.toggle("muted", p.muted);
+      document.getElementById(`solo-${i}`).classList.toggle("soloed", p.soloed);
+      const shouldPlay = anySolo ? p.soloed : !p.muted;
+      p.gain.gain.value = shouldPlay ? p.volume : 0;
+    });
+  }
+
+  function toggleMute(i) {
+    players[i].muted = !players[i].muted;
+    if (players[i].muted) players[i].soloed = false;
+    updateMixGains();
+  }
+
+  function toggleSolo(i) {
+    players[i].soloed = !players[i].soloed;
+    if (players[i].soloed) players[i].muted = false;
+    updateMixGains();
+  }
+
+  function setVolume(i, val) {
+    players[i].volume = parseFloat(val);
+    updateMixGains();
+  }
+
+  async function togglePlay() {
+    await Tone.start();
+    if (isPlaying || isCountingIn) {
+      pausePlayback();
+    } else {
+      if (countInEnabled) runCountInAndPlay(currentOffset);
+      else startPlayback(currentOffset);
+    }
+  }
+
+  function runCountInAndPlay(targetOffset) {
+    isCountingIn = true;
+    document.getElementById("btnPlay").textContent = "⏳ 1-2-3-4...";
+    const effectiveBpm = baseBpm * currentTempo;
+    const beatSec = 60 / effectiveBpm;
+    const now = Tone.now() + 0.05;
+
+    for (let i = 0; i < 4; i++) {
+      const clickTime = now + i * beatSec;
+      playClick(i === 0, clickTime);
+      setTimeout(() => {
+        if (isCountingIn) {
+          highlightBeatDot(i);
+          document.getElementById("chordCurrent").textContent = i + 1;
+        }
+      }, i * beatSec * 1000);
+    }
+
+    setTimeout(() => {
+      if (!isCountingIn) return;
+      isCountingIn = false;
+      startPlayback(targetOffset);
+    }, 4 * beatSec * 1000);
+  }
+
+  function startPlayback(offset) {
+    if (players.length === 0) return;
+    const now = Tone.now() + 0.05;
+    players.forEach(p => {
+      p.player.stop();
+      p.player.playbackRate = currentTempo;
+      p.player.start(now, offset);
+    });
+    currentOffset = offset;
+    lastPlayTimestamp = Tone.now();
+    lastPlayedBeatIndex = -1;
+    isPlaying = true;
+    document.getElementById("btnPlay").textContent = "⏸ Pausa";
+    updateLoopUI();
+  }
+
+  function pausePlayback() {
+    isCountingIn = false;
+    if (!isPlaying) {
+      document.getElementById("btnPlay").textContent = "▶️ Play";
+      return;
+    }
+    const elapsed = (Tone.now() - lastPlayTimestamp) * currentTempo;
+    currentOffset = Math.min(songDuration, currentOffset + elapsed);
+    players.forEach(p => p.player.stop());
+    isPlaying = false;
+    document.getElementById("btnPlay").textContent = "▶️ Play";
+    cancelAnimationFrame(animFrameId);
+  }
+
+  function stopPlayback() {
+    isCountingIn = false;
+    players.forEach(p => p.player.stop());
+    isPlaying = false;
+    currentOffset = loopA !== null ? loopA : 0;
+    lastPlayedBeatIndex = -1;
+    document.getElementById("btnPlay").textContent = "▶️ Play";
+    document.getElementById("seekBar").value = currentOffset;
+    document.getElementById("timeCurrent").textContent = formatTime(currentOffset);
+    cancelAnimationFrame(animFrameId);
+    updateChordDisplay(currentOffset);
+  }
+
+  document.getElementById("seekBar").addEventListener("input", (e) => {
+    const val = parseFloat(e.target.value);
+    document.getElementById("timeCurrent").textContent = formatTime(val);
+    updateChordDisplay(val);
+    if (isPlaying) startPlayback(val);
+    else currentOffset = val;
+  });
+
+  function changePitch(delta, reset = false) {
+    currentPitch = reset ? 0 : Math.max(-12, Math.min(12, currentPitch + delta));
+    document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch;
+    if (pitchShiftNode) pitchShiftNode.pitch = currentPitch;
+    updateChordDisplay(getCurrentPosition());
+  }
+
+  function changeTempo(delta, reset = false) {
+    if (isPlaying) {
+      currentOffset = getCurrentPosition();
+      lastPlayTimestamp = Tone.now();
+    }
+    currentTempo = reset ? 1.0 : Math.max(0.5, Math.min(1.5, +(currentTempo + delta).toFixed(2)));
+    document.getElementById("tempoVal").textContent = Math.round(currentTempo * 100) + "%";
+    players.forEach(p => p.player.playbackRate = currentTempo);
+  }
+
+  function changeBpm(delta) {
+    baseBpm = Math.max(40, Math.min(240, baseBpm + delta));
+    document.getElementById("bpmVal").textContent = baseBpm;
+  }
+
+  function tapBpm() {
+    const now = performance.now();
+    if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+    tapTimes.push(now);
+    if (tapTimes.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i - 1]);
+      const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      baseBpm = Math.round(60000 / avgMs);
+      document.getElementById("bpmVal").textContent = baseBpm;
+    }
+  }
+
+  function setLoopPoint(point) {
+    const pos = getCurrentPosition();
+    if (point === "A") {
+      loopA = pos;
+      document.getElementById("btnLoopA").classList.add("active-loop");
+    } else if (loopA !== null && pos > loopA) {
+      loopB = pos;
+      document.getElementById("btnLoopB").classList.add("active-loop");
+    }
+    document.getElementById("loopIndicator").textContent =
+      (loopA !== null ? `A:${formatTime(loopA)} ` : "") + (loopB !== null ? `B:${formatTime(loopB)}` : "");
+  }
+
+  function clearLoop() {
+    loopA = null; loopB = null;
+    document.getElementById("btnLoopA").classList.remove("active-loop");
+    document.getElementById("btnLoopB").classList.remove("active-loop");
+    document.getElementById("loopIndicator").textContent = "";
+  }
+
+  function getCurrentPosition() {
+    if (!isPlaying) return currentOffset;
+    return currentOffset + (Tone.now() - lastPlayTimestamp) * currentTempo;
+  }
+
+  function updateLoopUI() {
+    if (!isPlaying) return;
+    let pos = getCurrentPosition();
+
+    if (loopA !== null && loopB !== null && pos >= loopB) {
+      startPlayback(loopA);
+      return;
+    }
+    if (pos >= songDuration) {
+      stopPlayback();
+      return;
+    }
+
+    const beatDuration = 60 / baseBpm;
+    const adjustedPos = Math.max(0, pos - firstBeatOffset);
+    const currentBeatIdx = Math.floor(adjustedPos / beatDuration);
+
+    if (currentBeatIdx !== lastPlayedBeatIndex) {
+      lastPlayedBeatIndex = currentBeatIdx;
+      const beatInBar = currentBeatIdx % 4;
+      highlightBeatDot(beatInBar);
+      if (metroEnabled) playClick(beatInBar === 0);
+    }
+
+    document.getElementById("seekBar").value = pos;
+    document.getElementById("timeCurrent").textContent = formatTime(pos);
+    updateChordDisplay(pos);
+    animFrameId = requestAnimationFrame(updateLoopUI);
+  }
+
+  function enableControls(enabled) {
+    ["seekBar", "btnPlay", "btnStop", "btnLoopA", "btnLoopB", "btnLoopClear"].forEach(id => {
+      document.getElementById(id).disabled = !enabled;
+    });
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  }
+
+  function detectBpmFromBuffers(rawBuffers) {
+    const drumStem = rawBuffers.find(b => /drum|bat|perc/i.test(b.name)) || rawBuffers[0];
+    const buffer = drumStem.buffer;
+    const data = buffer.getChannelData(0);
+    const sr = buffer.sampleRate;
+
+    const maxSamples = Math.min(data.length, sr * 45);
+    const hop = Math.floor(sr * 0.01);
+    const env = [];
+    for (let i = 0; i < maxSamples; i += hop) {
+      let sum = 0;
+      for (let j = 0; j < hop && i + j < maxSamples; j++) sum += Math.abs(data[i + j]);
+      env.push(sum / hop);
+    }
+
+    const onset = env.map((v, i) => (i > 0 ? Math.max(0, v - env[i - 1]) : 0));
+
+    let bestBpm = 120, bestCorr = -1;
+    for (let bpm = 70; bpm <= 165; bpm++) {
+      const lag = Math.round((60 / bpm) / 0.01);
+      let corr = 0;
+      for (let i = 0; i < onset.length - lag; i++) {
+        corr += onset[i] * onset[i + lag];
+      }
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestBpm = bpm;
+      }
+    }
+
+    const threshold = Math.max(...onset) * 0.35;
+    let firstIdx = onset.findIndex(v => v > threshold);
+    const offset = firstIdx > 0 ? (firstIdx * 0.01) % (60 / bestBpm) : 0;
+
+    return { bpm: bestBpm, offset };
+  }
+
+  function detectChordsFromBuffers(rawBuffers) {
+    const harmonic = rawBuffers.filter(b => !/drum|bat|perc|voc|veu|sing/i.test(b.name));
+    const sources = harmonic.length > 0 ? harmonic : rawBuffers;
+
+    const sampleRate = sources[0].buffer.sampleRate;
+    const length = sources[0].buffer.length;
+    const stepSec = 0.5;
+    const stepSamples = Math.floor(sampleRate * stepSec);
+    const winSize = 4096;
+
+    const targetBins = [];
+    for (let midi = 36; midi <= 83; midi++) {
+      const freq = 440 * Math.pow(2, (midi - 69) / 12);
+      targetBins.push({ pc: midi % 12, omega: (2 * Math.PI * freq) / sampleRate });
+    }
+
+    const timeline = [];
+    let lastChordKey = "";
+
+    for (let offset = 0; offset + winSize < length; offset += stepSamples) {
+      const chroma = new Float32Array(12);
+      const frame = new Float32Array(winSize);
+      for (const src of sources) {
+        const ch = src.buffer.getChannelData(0);
+        for (let i = 0; i < winSize; i++) frame[i] += ch[offset + i];
+      }
+
+      for (const bin of targetBins) {
+        const coeff = 2 * Math.cos(bin.omega);
+        let s0 = 0, s1 = 0, s2 = 0;
+        for (let i = 0; i < winSize; i++) {
+          s0 = frame[i] + coeff * s1 - s2;
+          s2 = s1;
+          s1 = s0;
+        }
+        const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+        chroma[bin.pc] += Math.sqrt(Math.max(0, power));
+      }
+
+      let bestScore = -1, bestRoot = 0, bestQuality = "";
+      for (let r = 0; r < 12; r++) {
+        const majScore = chroma[r] * 1.2 + chroma[(r + 4) % 12] + chroma[(r + 7) % 12] - chroma[(r + 3) % 12] * 0.5;
+        const minScore = chroma[r] * 1.2 + chroma[(r + 3) % 12] + chroma[(r + 7) % 12] - chroma[(r + 4) % 12] * 0.5;
+
+        if (majScore > bestScore) { bestScore = majScore; bestRoot = r; bestQuality = ""; }
+        if (minScore > bestScore) { bestScore = minScore; bestRoot = r; bestQuality = "m"; }
+      }
+
+      const key = `${bestRoot}${bestQuality}`;
+      if (key !== lastChordKey && bestScore > 15) {
+        timeline.push({ time: offset / sampleRate, root: bestRoot, quality: bestQuality });
+        lastChordKey = key;
+      }
+    }
+    return timeline;
+  }
+
+  function formatTransposedChord(chordObj) {
+    if (!chordObj) return "--";
+    const transposedRoot = (chordObj.root + currentPitch + 120) % 12;
+    return NOTES[transposedRoot] + chordObj.quality;
+  }
+
+  function updateChordDisplay(pos) {
+    if (chordTimeline.length === 0) return;
+    let idx = 0;
+    for (let i = 0; i < chordTimeline.length; i++) {
+      if (chordTimeline[i].time <= pos) idx = i;
+      else break;
+    }
+    document.getElementById("chordCurrent").textContent = formatTransposedChord(chordTimeline[idx]);
+    document.getElementById("chordNext").textContent = formatTransposedChord(chordTimeline[idx + 1]);
+  }
+</script>
+</body>
+</html>
