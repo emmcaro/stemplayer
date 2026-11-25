@@ -113,7 +113,7 @@
     </div>
 
     <div id="stemsReadyBox" class="stems-ready-box" style="display:none">
-      <span id="stemsReadyLabel" style="font-size:0.88rem;font-weight:700">Pistes trobades</span>
+      <span id="stemsReadyLabel" style="font-size:0.88rem;font-weight:700">MP3 trobats</span>
       <button type="button" class="active-green" style="padding:7px 12px" onclick="loadCurrentFolderStems()">Carregar</button>
     </div>
 
@@ -211,6 +211,7 @@
 
   var audioCtx = null;
   var scriptNode = null;
+  var keepAliveNode = null;
   var stHarmonic = null;
   var stDrums = null;
   var stemsData = [];
@@ -300,7 +301,7 @@
       try {
         data = JSON.parse(text);
       } catch (err) {
-        setStatus("⚠️ Google no ha retornat dades JSON. Revisa que l'accés estigui posat a 'Qualsevol usuari' i hagis creat una 'Nova versió'.");
+        setStatus("⚠️ Google no ha retornat dades JSON. Revisa que l'accés estigui posat a 'Qualsevol usuari'.");
         document.getElementById("configCard").style.display = "block";
         return;
       }
@@ -321,12 +322,16 @@
       document.getElementById("btnBack").disabled = folderHistory.length <= 1;
       document.getElementById("currentFolderName").textContent = "📁 " + data.currentName;
       currentFolderTitle = data.currentName;
-      currentFolderStems = data.stems || [];
+
+      // Només ens quedem amb els MP3 (ignorem WAV si l'script antic en tornés cap)
+      currentFolderStems = (data.stems || []).filter(function(s) {
+        return !/\.wav$/i.test(s.name);
+      });
 
       var readyBox = document.getElementById("stemsReadyBox");
       if (currentFolderStems.length > 0) {
         readyBox.style.display = "flex";
-        document.getElementById("stemsReadyLabel").textContent = "🎵 " + currentFolderStems.length + " arxius d'àudio trobats";
+        document.getElementById("stemsReadyLabel").textContent = "🎵 " + currentFolderStems.length + " arxius MP3 trobats";
       } else {
         readyBox.style.display = "none";
       }
@@ -358,22 +363,39 @@
     browseFolder(prevId, true);
   }
 
+  // Detecta el nom de l'instrument sense silenciar per error cap stem
   function classifyTrackNames(names) {
-    if (names.length <= 1) {
-      return names.map(function(n) { return { displayName: n, isOriginal: false }; });
-    }
-    var prefix = names[0];
-    for (var i = 1; i < names.length; i++) {
-      while (names[i].indexOf(prefix) !== 0) {
+    var INSTRUMENT_REGEX = /(vocals?|veu|voice|drums?|bateria|bat|perc|bass|baix|guitars?|guitarra|guit|piano|keys?|teclat|other|altres|altre|synth)/i;
+
+    // 1. Determina quines pistes són instruments i quina és l'MP3 original
+    var flags = names.map(function(name) {
+      var match = name.match(INSTRUMENT_REGEX);
+      return {
+        hasInstrument: !!match,
+        matchedWord: match ? match[0] : ""
+      };
+    });
+
+    var anyHasInstrument = flags.some(function(f) { return f.hasInstrument; });
+
+    // 2. Calcula el prefix comú només entre els stems d'instruments per deixar el nom net
+    var stemNames = names.filter(function(_, idx) { return flags[idx].hasInstrument; });
+    var prefix = stemNames.length > 1 ? stemNames[0] : "";
+    for (var i = 1; i < stemNames.length; i++) {
+      while (stemNames[i].indexOf(prefix) !== 0) {
         prefix = prefix.substring(0, prefix.length - 1);
         if (prefix === "") break;
       }
     }
-    var KNOWN = /(vocal|veu|voice|drum|bat|perc|bass|baix|guitar|guit|piano|key|teclat|other|altre|instr|stem|synth)/i;
-    return names.map(function(name) {
-      var rem = name.slice(prefix.length).replace(/^[\s\-_.:()\[\]]+/, "").trim();
-      var isOrig = rem === "" || (!KNOWN.test(rem) && names.some(function(o) { return KNOWN.test(o.slice(prefix.length)); }));
-      return { displayName: isOrig ? "Original" : rem, isOriginal: isOrig };
+
+    return names.map(function(name, idx) {
+      var isOrig = anyHasInstrument && !flags[idx].hasInstrument;
+      if (isOrig) {
+        return { displayName: "Original", isOriginal: true };
+      }
+      var clean = prefix ? name.slice(prefix.length).replace(/^[\s\-_.:()\[\]]+/, "").trim() : "";
+      if (!clean) clean = flags[idx].matchedWord || name;
+      return { displayName: clean, isOriginal: false };
     });
   }
 
@@ -386,13 +408,13 @@
     var url = localStorage.getItem("stemstudio_url");
     var completed = 0;
     var total = currentFolderStems.length;
-    setStatus("Baixant " + total + " pistes en paral·lel (0/" + total + ")...");
+    setStatus("Baixant " + total + " MP3 en paral·lel (0/" + total + ")...");
 
     try {
       var promises = currentFolderStems.map(async function(stem) {
         var res = await fetch(url + "?action=audio&fileId=" + stem.id, { redirect: "follow" });
         var json = await res.json();
-        var byteRes = await fetch("data:" + (json.mimeType || "audio/mp3") + ";base64," + json.data);
+        var byteRes = await fetch("data:audio/mpeg;base64," + json.data);
         var arrayBuffer = await byteRes.arrayBuffer();
         var audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
         completed++;
@@ -449,6 +471,8 @@
 
   function setupDualSoundTouchEngine() {
     if (scriptNode) scriptNode.disconnect();
+    if (keepAliveNode) keepAliveNode.disconnect();
+
     var ST = window.soundtouch;
     if (!ST) {
       setStatus("⚠️ No s'ha carregat el motor d'àudio SoundTouch.");
@@ -504,6 +528,14 @@
     var bufHarm = new Float32Array(bufferSize * 2);
     var bufDrum = new Float32Array(bufferSize * 2);
 
+    // Font silenciosa connectada a l'entrada perquè iOS Safari mai adormi el ScriptProcessor
+    var silentBuffer = audioCtx.createBuffer(2, bufferSize, sampleRate);
+    keepAliveNode = audioCtx.createBufferSource();
+    keepAliveNode.buffer = silentBuffer;
+    keepAliveNode.loop = true;
+    keepAliveNode.connect(scriptNode);
+    keepAliveNode.start();
+
     scriptNode.onaudioprocess = function(e) {
       var outL = e.outputBuffer.getChannelData(0);
       var outR = e.outputBuffer.getChannelData(1);
@@ -531,7 +563,7 @@
         outR[j] = 0;
       }
 
-      samplePosition = filterHarmonic.sourcePosition;
+      samplePosition = Math.max(filterHarmonic.sourcePosition, filterDrums.sourcePosition);
 
       if (samplePosition >= maxSamples) {
         isPlaying = false;
