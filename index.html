@@ -6,434 +6,671 @@
   <title>StemStudio</title>
   <style>
     :root {
-      --bg: #09090b;
-      --surface: #121215;
-      --surface-elevated: #1c1c21;
-      --border: #27272a;
-      --primary: #e4e4e7;
-      --accent: #38bdf8;
-      --mute: #ef4444;
-      --solo: #f59e0b;
-      --loop: #eab308;
-      --green: #10b981;
-      --text: #fafafa;
-      --muted: #71717a;
+      --bg: #090a12;
+      --surface: #141626;
+      --surface-2: #1c1f35;
+      --border: #272b45;
+      --text: #f8fafc;
+      --muted: #8b90b2;
+      --violet: #7c3aed;
+      --violet-glow: rgba(124, 58, 237, 0.35);
+      --cyan: #38bdf8;
+      --blue: #3b82f6;
+      --solo: #38bdf8;
+      --solo-bg: rgba(56, 189, 248, 0.16);
+      --mute: #f43f5e;
+      --mute-bg: rgba(244, 63, 94, 0.16);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 85% 8%, rgba(124, 58, 237, 0.22), transparent 42%),
+        radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.14), transparent 38%);
+      background-attachment: fixed;
       color: var(--text);
-      padding: 12px;
-      padding-bottom: 84px;
-      max-width: 720px;
+      padding: 12px 14px 76px 14px;
+      max-width: 680px;
       margin-left: auto;
       margin-right: auto;
       font-variant-numeric: tabular-nums;
+      user-select: none;
     }
 
-    .top-bar {
+    /* Capçalera superior neta */
+    .top-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
-      gap: 10px;
-    }
-    .brand {
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    .song-title {
-      font-size: 0.92rem;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex: 1;
-      text-align: right;
-    }
-    .nav-tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      background: var(--surface);
-      padding: 3px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
+      justify-content: space-between;
       margin-bottom: 12px;
     }
-    .nav-btn {
-      background: transparent;
-      color: var(--muted);
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 0.84rem;
-      letter-spacing: 0.02em;
-      border: none;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .nav-btn.active {
-      background: var(--surface-elevated);
+    .brand-logo {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--cyan), var(--violet));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+    .brand-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .brand-name span {
+      background: linear-gradient(90deg, var(--cyan), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .config-circle-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
       color: var(--text);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
 
     .view-section { display: none; }
     .view-section.active { display: block; }
 
-    .panel {
+    /* Configuració URL */
+    .config-panel {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 16px;
       padding: 12px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
-    .panel-label {
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    input[type="url"], button {
-      font-size: 0.85rem;
-      border-radius: 6px;
+    .config-row { display: flex; gap: 8px; margin-top: 8px; }
+    input[type="url"] {
+      flex: 1;
+      background: var(--bg);
       border: 1px solid var(--border);
-      background: var(--surface-elevated);
       color: var(--text);
-      padding: 8px 12px;
-      font-weight: 500;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 0.84rem;
     }
-    button { cursor: pointer; transition: opacity 0.15s, background 0.15s; }
-    button:active { opacity: 0.8; }
-    button:disabled { opacity: 0.3; cursor: not-allowed; }
-    button.btn-primary {
-      background: var(--text);
-      color: var(--bg);
-      border-color: var(--text);
-      font-weight: 700;
-    }
-    button.btn-load {
-      background: var(--green);
-      color: #052e16;
-      border-color: var(--green);
-      font-weight: 700;
-    }
-    button.active-loop {
-      background: var(--loop);
-      color: #09090b;
-      border-color: var(--loop);
-      font-weight: 700;
-    }
-    button.active-green {
-      background: var(--green);
-      color: #052e16;
-      border-color: var(--green);
-      font-weight: 700;
+    .btn-primary-pill {
+      background: linear-gradient(135deg, var(--blue), var(--violet));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-weight: 600;
+      font-size: 0.84rem;
+      cursor: pointer;
     }
 
-    .row { display: flex; gap: 8px; align-items: center; }
-    .grow { flex: 1; min-width: 0; }
+    /* Targetes estil PlayLearn */
+    .card {
+      background: rgba(20, 22, 38, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+    }
 
-    .browser-bar {
+    /* Targeta Reproductor Superior (sense foto ni ona) */
+    .player-top-info {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
       margin-bottom: 10px;
+      gap: 10px;
     }
-    .folder-path {
-      font-weight: 600;
-      font-size: 0.9rem;
+    .song-title {
+      font-size: 1.05rem;
+      font-weight: 700;
       color: var(--text);
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
     }
-    .folder-list {
-      max-height: 60vh;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .song-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
     }
-    .folder-item {
-      background: var(--bg);
-      padding: 11px 12px;
-      border-radius: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
+    .bpm-pill-tag {
+      background: var(--surface-2);
       border: 1px solid var(--border);
-      font-size: 0.88rem;
-      font-weight: 500;
-    }
-    .folder-item:active { background: var(--surface-elevated); }
-    .stems-ready-box {
-      background: rgba(16, 185, 129, 0.08);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      padding: 10px 12px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
+      color: var(--cyan);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
     }
 
-    .mixer-panel {
-      padding: 14px 12px;
+    .timeline-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .time-txt {
+      font-size: 0.75rem;
+      color: var(--muted);
+      min-width: 34px;
+    }
+    .time-txt.right { text-align: right; }
+
+    /* Botons de transport centrats amb cercle violeta */
+    .transport-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+    }
+    .icon-action-btn {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .icon-action-btn:active { background: var(--surface-2); }
+    .icon-action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .icon-action-btn.active-state {
+      color: var(--cyan);
+      background: var(--solo-bg);
+    }
+    .loop-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .loop-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .loop-chip.on {
+      background: var(--solo-bg);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .loop-chip:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .play-violet-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #8b5cf6, var(--violet));
+      color: #fff;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 18px var(--violet-glow);
+    }
+    .play-violet-btn:disabled { opacity: 0.35; box-shadow: none; cursor: not-allowed; }
+
+    /* Dues píndoles de Velocitat i Tonalitat (estil Speed / Pitch de la captura) */
+    .dual-pills {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .param-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .param-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .param-icon {
+      color: var(--cyan);
+      flex-shrink: 0;
+    }
+    .param-name {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .param-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .param-val {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 36px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .step-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .step-btn:active { background: var(--violet); border-color: var(--violet); }
+
+    /* Mesclador Protagonista */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .section-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
     }
     .stem-row {
       display: grid;
-      grid-template-columns: 82px 36px 36px 1fr;
-      gap: 8px;
+      grid-template-columns: 102px 1fr 28px 28px;
       align-items: center;
-      padding: 9px 0;
-      border-bottom: 1px solid var(--border);
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
     .stem-row:last-child { border-bottom: none; padding-bottom: 2px; }
+    .stem-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .stem-icon {
+      width: 17px;
+      height: 17px;
+      color: var(--cyan);
+      flex-shrink: 0;
+    }
     .stem-name {
-      font-weight: 600;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      color: var(--text);
     }
-    .stem-name.is-original {
-      color: var(--muted);
-      font-weight: 500;
-    }
-    .stem-name.is-metro {
-      color: var(--accent);
-    }
-    .btn-ms {
-      padding: 7px 0;
-      font-size: 0.75rem;
-      font-weight: 700;
-      background: var(--surface-elevated);
-      color: var(--muted);
+    .stem-name.is-original { color: var(--muted); }
+    .stem-name.is-metro { color: #a78bfa; }
+
+    .ms-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
       border: 1px solid var(--border);
-      border-radius: 5px;
-      text-align: center;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
     }
-    .btn-ms.muted {
-      background: var(--mute);
-      color: #fff;
-      border-color: var(--mute);
-    }
-    .btn-ms.soloed {
-      background: var(--solo);
-      color: #09090b;
+    .ms-btn.soloed {
       border-color: var(--solo);
+      background: var(--solo-bg);
+      color: var(--solo);
+    }
+    .ms-btn.muted {
+      border-color: var(--mute);
+      background: var(--mute-bg);
+      color: var(--mute);
     }
 
+    /* Sliders violeta-blau */
     input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
       background: transparent;
-      height: 28px;
+      height: 24px;
       margin: 0;
+      cursor: pointer;
     }
     input[type="range"]::-webkit-slider-runnable-track {
       height: 4px;
-      background: var(--border);
-      border-radius: 2px;
+      background: #272b45;
+      border-radius: 3px;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      background: var(--text);
-      margin-top: -6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+      background: #fff;
+      border: 2px solid var(--violet);
+      margin-top: -5px;
+      box-shadow: 0 0 8px var(--violet-glow);
     }
 
-    .harmony-bar {
+    /* Targeta d'Acords + BPM */
+    .chords-bpm-grid {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      background: var(--bg);
+      grid-template-columns: 1.3fr 1fr;
+      gap: 10px;
+    }
+    .chord-box {
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 10px;
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
-    .chord-block { text-align: left; }
-    .chord-block.right { text-align: right; }
-    .chord-tag {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
+    .chords-line {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 6px 0 8px 0;
     }
-    .chord-current {
-      font-size: 1.85rem;
+    .chord-now {
+      font-size: 1.95rem;
       font-weight: 800;
-      color: var(--accent);
-      line-height: 1.15;
+      background: linear-gradient(90deg, var(--cyan), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      line-height: 1;
     }
     .chord-next {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 600;
       color: var(--muted);
-      line-height: 1.2;
     }
     .beat-dots {
       display: flex;
-      gap: 6px;
-      justify-content: center;
-      padding: 0 12px;
+      gap: 7px;
     }
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: var(--border);
-      transition: transform 0.06s, background 0.06s;
+      transition: 0.06s;
     }
-    .dot.active { background: var(--text); transform: scale(1.25); }
-    .dot.accent { background: var(--accent); transform: scale(1.35); }
+    .dot.active { background: var(--cyan); transform: scale(1.25); }
+    .dot.accent { background: #a78bfa; transform: scale(1.4); box-shadow: 0 0 8px var(--violet); }
 
-    .time-row {
+    .bpm-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px;
       display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-    .time-code {
-      font-size: 0.78rem;
-      color: var(--muted);
-      min-width: 34px;
-    }
-    .loop-row {
-      display: flex;
+      flex-direction: column;
       justify-content: space-between;
       align-items: center;
+    }
+    .bpm-big {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text);
+      margin: 4px 0;
+    }
+    .bpm-btns {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Vista Biblioteca */
+    .browser-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .folder-path {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .folder-list {
+      max-height: 62vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
       gap: 6px;
     }
-    .loop-btns { display: flex; gap: 6px; }
-    .loop-btns button { padding: 5px 10px; font-size: 0.76rem; }
-
-    .params-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-    }
-    .param-box {
+    .folder-item {
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 6px;
-      text-align: center;
-    }
-    .param-title {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-    }
-    .param-val {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--text);
-      margin: 4px 0 6px 0;
-    }
-    .param-btns {
+      border-radius: 12px;
+      padding: 12px 14px;
       display: flex;
-      justify-content: center;
-      gap: 3px;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
     }
-    .param-btns button {
-      padding: 5px 7px;
-      font-size: 0.76rem;
+    .folder-item:active { background: var(--surface-2); }
+    .stems-ready-box {
+      background: var(--solo-bg);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .status-msg {
+      font-size: 0.8rem;
+      color: var(--cyan);
+      margin-top: 8px;
     }
 
-    .transport-bar {
+    /* Barra de navegació inferior de 2 pestanyes (estil barra inferior de la captura) */
+    .bottom-nav {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: var(--surface);
+      background: rgba(12, 13, 24, 0.95);
       border-top: 1px solid var(--border);
-      padding: 10px 14px;
+      backdrop-filter: blur(12px);
       display: flex;
       justify-content: center;
       z-index: 50;
+      padding: 6px 0 10px 0;
     }
-    .transport-inner {
+    .bottom-nav-inner {
       width: 100%;
-      max-width: 720px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
+      max-width: 680px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
     }
-    .status-msg {
-      font-size: 0.8rem;
-      color: var(--accent);
-      margin-top: 8px;
-      word-break: break-word;
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .nav-tab.active {
+      color: #a78bfa;
     }
   </style>
 </head>
 <body>
 
-  <div class="top-bar">
-    <span class="brand">StemStudio</span>
-    <span id="activeSongHeader" class="song-title">Cap pista carregada</span>
-    <button type="button" style="padding:5px 9px;font-size:0.75rem" onclick="toggleConfig()">Config</button>
-  </div>
-
-  <div id="configCard" class="panel">
-    <div class="panel-label">Connexió Google Apps Script</div>
-    <div class="row">
-      <input id="scriptUrlInput" class="grow" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
-      <button type="button" class="btn-primary" onclick="saveUrlAndBrowse()">Connectar</button>
+  <!-- Capçalera superior -->
+  <div class="top-header">
+    <div class="brand-wrap">
+      <div class="brand-logo">S</div>
+      <div class="brand-name">Stem<span>Studio</span></div>
     </div>
+    <button type="button" class="config-circle-btn" onclick="toggleConfig()" aria-label="Configuració">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </div>
 
-  <div class="nav-tabs">
-    <button type="button" id="tab-console" class="nav-btn active" onclick="switchTab('console')">Consola</button>
-    <button type="button" id="tab-browser" class="nav-btn" onclick="switchTab('browser')">Biblioteca</button>
+  <!-- Configuració URL -->
+  <div id="configCard" class="config-panel">
+    <div style="font-size:0.78rem;color:var(--muted);font-weight:600">URL del servei Google Apps Script</div>
+    <div class="config-row">
+      <input id="scriptUrlInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button type="button" class="btn-primary-pill" onclick="saveUrlAndBrowse()">Connectar</button>
+    </div>
   </div>
 
   <!-- PÀGINA 1: CONSOLA -->
   <div id="view-console" class="view-section active">
-    
-    <div class="panel mixer-panel">
-      <div class="panel-label">
-        <span>Mesclador de pistes</span>
-        <span id="mixerBpmBadge" style="color:var(--text)">-- BPM</span>
+
+    <!-- Targeta Reproductor (sense foto ni ona sonora) -->
+    <div class="card">
+      <div class="player-top-info">
+        <div style="min-width:0">
+          <div id="activeSongHeader" class="song-title">Cap cançó carregada</div>
+          <div id="songSubHeader" class="song-meta">Obre la Biblioteca per triar pistes</div>
+        </div>
+        <div id="bpmBadge" class="bpm-pill-tag">-- BPM</div>
       </div>
-      <div id="mixerContainer">
-        <div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:28px 12px">
-          Obre la pestanya Biblioteca per seleccionar una cançó.
+
+      <div class="timeline-row">
+        <span id="timeCurrent" class="time-txt">0:00</span>
+        <input id="seekBar" type="range" min="0" max="100" value="0" step="0.1" disabled />
+        <span id="timeTotal" class="time-txt right">0:00</span>
+      </div>
+
+      <div class="transport-controls">
+        <!-- Bucle A-B -->
+        <div class="loop-group">
+          <button type="button" id="btnLoopA" class="loop-chip" onclick="setLoopPoint('A')" disabled>A</button>
+          <button type="button" id="btnLoopB" class="loop-chip" onclick="setLoopPoint('B')" disabled>B</button>
+          <button type="button" id="btnLoopClear" class="loop-chip" onclick="clearLoop()" disabled>×</button>
+        </div>
+
+        <!-- Aturar -->
+        <button type="button" id="btnStop" class="icon-action-btn" onclick="stopPlayback()" disabled aria-label="Aturar">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+        </button>
+
+        <!-- Play / Pausa central violeta -->
+        <button type="button" id="btnPlay" class="play-violet-btn" onclick="togglePlay()" disabled aria-label="Reproduir">
+          <svg id="playIconSvg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        </button>
+
+        <!-- Pre-compte 1-2-3-4 -->
+        <button type="button" id="btnCountIn" class="icon-action-btn" onclick="toggleCountIn()" style="width:auto;padding:0 10px;border-radius:10px">
+          1-2-3-4
+        </button>
+      </div>
+    </div>
+
+    <!-- Dues píndoles de Velocitat i Tonalitat (estil Speed / Pitch de la imatge) -->
+    <div class="dual-pills">
+      <div class="param-pill">
+        <div class="param-left">
+          <svg class="param-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+          <span class="param-name">Velocitat</span>
+        </div>
+        <div class="param-ctrl">
+          <button type="button" class="step-btn" onclick="changeTempo(-0.05)">-</button>
+          <span id="tempoVal" class="param-val" onclick="changeTempo(1, true)">100%</span>
+          <button type="button" class="step-btn" onclick="changeTempo(0.05)">+</button>
+        </div>
+      </div>
+
+      <div class="param-pill">
+        <div class="param-left">
+          <svg class="param-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span class="param-name">Tonalitat</span>
+        </div>
+        <div class="param-ctrl">
+          <button type="button" class="step-btn" onclick="changePitch(-1)">-</button>
+          <span id="pitchVal" class="param-val" onclick="changePitch(0, true)">0 st</span>
+          <button type="button" class="step-btn" onclick="changePitch(1)">+</button>
         </div>
       </div>
     </div>
 
-    <div class="panel">
-      <div class="harmony-bar">
-        <div class="chord-block">
-          <div class="chord-tag">Actual</div>
-          <div id="chordCurrent" class="chord-current">--</div>
+    <!-- Mesclador protagonista -->
+    <div class="card">
+      <div class="section-header">
+        <span class="section-title">Mesclador</span>
+        <span style="font-size:0.74rem;color:var(--muted)">Solo / Silenci</span>
+      </div>
+      <div id="mixerContainer">
+        <div style="color:var(--muted);font-size:0.84rem;text-align:center;padding:24px 10px">
+          Cap pista carregada. Obre la Biblioteca a baix.
+        </div>
+      </div>
+    </div>
+
+    <!-- Acords i Tempo BPM -->
+    <div class="chords-bpm-grid">
+      <div class="chord-box">
+        <div style="font-size:0.74rem;color:var(--muted);font-weight:600">Acords</div>
+        <div class="chords-line">
+          <div id="chordCurrent" class="chord-now">--</div>
+          <div id="chordNext" class="chord-next">--</div>
         </div>
         <div class="beat-dots">
           <div id="dot-0" class="dot"></div>
@@ -441,56 +678,15 @@
           <div id="dot-2" class="dot"></div>
           <div id="dot-3" class="dot"></div>
         </div>
-        <div class="chord-block right">
-          <div class="chord-tag">Següent</div>
-          <div id="chordNext" class="chord-next">--</div>
-        </div>
       </div>
 
-      <div class="time-row">
-        <span id="timeCurrent" class="time-code">0:00</span>
-        <input id="seekBar" class="grow" type="range" min="0" max="100" value="0" step="0.1" disabled />
-        <span id="timeTotal" class="time-code" style="text-align:right">0:00</span>
-      </div>
-
-      <div class="loop-row">
-        <span id="loopIndicator" style="font-size:0.75rem;color:var(--loop);font-weight:600"></span>
-        <div class="loop-btns">
-          <button type="button" id="btnLoopA" onclick="setLoopPoint('A')" disabled>Inici A</button>
-          <button type="button" id="btnLoopB" onclick="setLoopPoint('B')" disabled>Final B</button>
-          <button type="button" id="btnLoopClear" onclick="clearLoop()" disabled>Netejar</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="params-grid">
-        <div class="param-box">
-          <div class="param-title">Tonalitat</div>
-          <div id="pitchVal" class="param-val">0</div>
-          <div class="param-btns">
-            <button type="button" onclick="changePitch(-1)">-1</button>
-            <button type="button" onclick="changePitch(0, true)">0</button>
-            <button type="button" onclick="changePitch(1)">+1</button>
-          </div>
-        </div>
-        <div class="param-box">
-          <div class="param-title">Velocitat</div>
-          <div id="tempoVal" class="param-val">100%</div>
-          <div class="param-btns">
-            <button type="button" onclick="changeTempo(-0.05)">-5%</button>
-            <button type="button" onclick="changeTempo(1, true)">100%</button>
-            <button type="button" onclick="changeTempo(0.05)">+5%</button>
-          </div>
-        </div>
-        <div class="param-box">
-          <div class="param-title">Tempo BPM</div>
-          <div id="bpmVal" class="param-val">120</div>
-          <div class="param-btns">
-            <button type="button" onclick="changeBpm(-1)">-1</button>
-            <button type="button" onclick="tapBpm()">Tap</button>
-            <button type="button" onclick="changeBpm(1)">+1</button>
-          </div>
+      <div class="bpm-box">
+        <div style="font-size:0.74rem;color:var(--muted);font-weight:600">Tempo BPM</div>
+        <div id="bpmVal" class="bpm-big">120</div>
+        <div class="bpm-btns">
+          <button type="button" class="step-btn" onclick="changeBpm(-1)">-</button>
+          <button type="button" class="step-btn" style="width:auto;padding:0 8px;font-size:0.72rem" onclick="tapBpm()">Tap</button>
+          <button type="button" class="step-btn" onclick="changeBpm(1)">+</button>
         </div>
       </div>
     </div>
@@ -499,33 +695,38 @@
 
   <!-- PÀGINA 2: BIBLIOTECA -->
   <div id="view-browser" class="view-section">
-    <div class="panel">
+    <div class="card">
       <div class="browser-bar">
-        <button type="button" id="btnBack" style="padding:7px 10px" onclick="goBackFolder()" disabled>Enrere</button>
+        <button type="button" id="btnBack" class="loop-chip" style="padding:7px 11px;font-size:0.78rem;color:var(--text)" onclick="goBackFolder()" disabled>Enrere</button>
         <div id="currentFolderName" class="folder-path">Google Drive</div>
-        <button type="button" style="padding:7px 10px" onclick="browseFolder('root')">Inici</button>
+        <button type="button" class="loop-chip" style="padding:7px 11px;font-size:0.78rem;color:var(--text)" onclick="browseFolder('root')">Inici</button>
       </div>
 
       <div id="stemsReadyBox" class="stems-ready-box" style="display:none">
-        <span id="stemsReadyLabel" style="font-size:0.86rem;font-weight:600">Pistes detectades</span>
-        <button type="button" class="btn-load" onclick="loadCurrentFolderStems()">Carregar pistes</button>
+        <span id="stemsReadyLabel" style="font-size:0.84rem;font-weight:600;color:var(--cyan)">Pistes trobades</span>
+        <button type="button" class="btn-primary-pill" style="padding:7px 14px" onclick="loadCurrentFolderStems()">Carregar</button>
       </div>
 
       <div id="folderList" class="folder-list">
-        <div style="color:var(--muted);font-size:0.85rem;padding:12px 4px">
-          Configura l'URL de Google Apps Script per explorar les carpetes.
+        <div style="color:var(--muted);font-size:0.84rem;padding:12px 4px">
+          Connecta l'URL de Google Apps Script per navegar per les carpetes.
         </div>
       </div>
       <div id="statusText" class="status-msg"></div>
     </div>
   </div>
 
-  <!-- BARRA DE TRANSPORT FIXA -->
-  <div class="transport-bar">
-    <div class="transport-inner">
-      <button type="button" onclick="stopPlayback()" id="btnStop" style="padding:11px 14px" disabled>Aturar</button>
-      <button type="button" onclick="toggleCountIn()" id="btnCountIn" style="padding:11px 12px">1-2-3-4</button>
-      <button type="button" class="btn-primary" onclick="togglePlay()" id="btnPlay" style="flex:1;padding:11px;font-size:0.95rem" disabled>Reproduir</button>
+  <!-- Barra de navegació inferior de 2 pestanyes -->
+  <div class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button type="button" id="tab-console" class="nav-tab active" onclick="switchTab('console')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        <span>Consola</span>
+      </button>
+      <button type="button" id="tab-browser" class="nav-tab" onclick="switchTab('browser')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span>Biblioteca</span>
+      </button>
     </div>
   </div>
 
@@ -566,7 +767,18 @@
 
   var NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
 
-  // Processador WSOLA d'alta fidelitat amb alineació de fase (sense cancel·lació de greus ni trèmolo)
+  var ICONS = {
+    "Veus": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>',
+    "Bateria": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="8" rx="9" ry="4"/><path d="M3 8v8c0 2.2 4 4 9 4s9-1.8 9-4V8"/><line x1="7" y1="11.5" x2="7" y2="19.5"/><line x1="17" y1="11.5" x2="17" y2="19.5"/></svg>',
+    "Baix": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+    "Guitarra": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11.9 12.1 4.5-4.5"/><path d="M15 4l5 5"/><path d="M8.5 14.5c-2.5 0-4.5 2-4.5 4.5S6 23.5 8.5 23.5c1.8 0 3.3-1 4-2.5.7-1.5 2.5-2.5 2.5-4 0-1.4-1.1-2.5-2.5-2.5-1.5 0-2.5 1.8-4 2.5z"/></svg>',
+    "Piano": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/><rect x="7" y="4" width="4" height="9" fill="currentColor"/><rect x="13" y="4" width="4" height="9" fill="currentColor"/></svg>',
+    "Altres": '<svg class="stem-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 12 4-10 2 4h5"/></svg>',
+    "Original": '<svg class="stem-icon" style="color:var(--muted)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/></svg>',
+    "Claqueta": '<svg class="stem-icon" style="color:#a78bfa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 20 12 4 18 20 6 20"/><line x1="12" y1="15" x2="19" y2="7"/></svg>'
+  };
+
+  // Processador WSOLA amb correlació de fase i baixa latència (finestra 2048)
   var WORKLET_CODE = `
     class WsolaPitchShifter extends AudioWorkletProcessor {
       static get parameterDescriptors() {
@@ -580,8 +792,8 @@
         this.ringR = new Float32Array(this.bufSize);
         this.writeIdx = 0;
 
-        this.winSize = 4096;
-        this.halfWin = 2048;
+        this.winSize = 2048;
+        this.halfWin = 1024;
         this.hann = new Float32Array(this.winSize);
         for (let i = 0; i < this.winSize; i++) {
           this.hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / this.winSize));
@@ -602,13 +814,12 @@
         return ring[i0] + (ring[i1] - ring[i0]) * frac;
       }
 
-      // Busca el desplaçament òptim (correlació de fase) perquè les dues finestres sumin en fase i no perdin volum
       findBestPhaseOffset(targetRead, refRead, ratio) {
         let bestOffset = 0;
         let bestCorr = -1e18;
-        const searchRange = 384;
+        const searchRange = 256;
         const step = 4;
-        const corrLen = 256;
+        const corrLen = 192;
 
         for (let delta = -searchRange; delta <= searchRange; delta += step) {
           let corr = 0;
@@ -637,7 +848,7 @@
         const ratio = parameters.pitchRatio[0];
         const len = inL.length;
 
-        if (Math.abs(ratio - 1.0) < 0.001) {
+        if (Math.abs(ratio - 1.0) < 0.002) {
           for (let i = 0; i < len; i++) {
             this.ringL[this.writeIdx] = inL[i];
             this.ringR[this.writeIdx] = inR[i];
@@ -649,10 +860,9 @@
           return true;
         }
 
-        // Retard de seguretat ample perquè el punter de lectura mai atrapi el d'escriptura
         const baseDelay = ratio > 1.0
-          ? Math.ceil(this.winSize * (ratio - 1.0)) + 2048
-          : 2048;
+          ? Math.ceil(this.winSize * (ratio - 1.0)) + 1024
+          : 1024;
 
         if (this.wasBypass) {
           this.phaseA = 0;
@@ -818,7 +1028,7 @@
       var readyBox = document.getElementById("stemsReadyBox");
       if (currentFolderStems.length > 0) {
         readyBox.style.display = "flex";
-        document.getElementById("stemsReadyLabel").textContent = currentFolderStems.length + " arxius d'àudio";
+        document.getElementById("stemsReadyLabel").textContent = currentFolderStems.length + " pistes disponibles";
       } else {
         readyBox.style.display = "none";
       }
@@ -831,7 +1041,7 @@
         data.folders.forEach(function(f) {
           var item = document.createElement("div");
           item.className = "folder-item";
-          item.innerHTML = '<span>' + f.name + '</span><span style="color:var(--muted)">/</span>';
+          item.innerHTML = '<span>' + f.name + '</span><span style="color:var(--muted)">›</span>';
           item.onclick = function() { browseFolder(f.id, false); };
           listEl.appendChild(item);
         });
@@ -922,10 +1132,10 @@
         var gainNode = audioCtx.createGain();
         gainNode.gain.value = info.isOriginal ? 0 : 1.0;
 
-        if (info.isDrum || !workletReady || !pitchWorkletNode) {
-          gainNode.connect(audioCtx.destination);
-        } else {
+        if (workletReady && pitchWorkletNode) {
           gainNode.connect(pitchWorkletNode);
+        } else {
+          gainNode.connect(audioCtx.destination);
         }
 
         return {
@@ -962,7 +1172,8 @@
       baseBpm = tempoInfo.bpm;
       firstBeatOffset = tempoInfo.offset;
       document.getElementById("bpmVal").textContent = baseBpm;
-      document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+      document.getElementById("bpmBadge").textContent = baseBpm + " BPM";
+      document.getElementById("songSubHeader").textContent = onlyStems.length + " pistes separades";
 
       chordTimeline = detectChordsFromBuffers(analysisSources);
 
@@ -978,15 +1189,18 @@
     }
   }
 
+  function getWorkletRatio() {
+    return Math.pow(2, currentPitch / 12) / currentTempo;
+  }
+
   async function startNativeSources(offsetSec) {
     stopNativeSources();
     await ensureAudioContext();
 
     var now = audioCtx.currentTime + 0.03;
-    var pitchRatio = Math.pow(2, currentPitch / 12);
 
     if (workletReady && pitchWorkletNode) {
-      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(pitchRatio, now);
+      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(getWorkletRatio(), now);
     }
 
     stemsData.forEach(function(s) {
@@ -1004,7 +1218,7 @@
     playStartTime = now;
     lastPlayedBeatIndex = -1;
     isPlaying = true;
-    document.getElementById("btnPlay").textContent = "Pausa";
+    setPlayIcon(true);
     updateLoopUI();
   }
 
@@ -1021,9 +1235,8 @@
   }
 
   function applyLiveRateAndPitch() {
-    var pitchRatio = Math.pow(2, currentPitch / 12);
-    if (workletReady && pitchWorkletNode) {
-      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(pitchRatio, audioCtx.currentTime);
+    if (workletReady && pitchWorkletNode && audioCtx) {
+      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(getWorkletRatio(), audioCtx.currentTime);
     }
     if (!isPlaying) return;
     stemsData.forEach(function(s) {
@@ -1031,6 +1244,15 @@
         s.sourceNode.playbackRate.value = currentTempo;
       }
     });
+  }
+
+  function setPlayIcon(playing) {
+    var svg = document.getElementById("playIconSvg");
+    if (playing) {
+      svg.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+    } else {
+      svg.innerHTML = '<polygon points="6 4 20 12 6 20 6 4"/>';
+    }
   }
 
   function playClick(isAccent) {
@@ -1060,22 +1282,29 @@
     container.innerHTML = "";
 
     stemsData.forEach(function(s, i) {
+      var iconSvg = ICONS[s.name] || ICONS["Altres"];
       var row = document.createElement("div");
       row.className = "stem-row";
       row.innerHTML =
-        '<div class="stem-name ' + (s.isOriginal ? "is-original" : "") + '" title="' + s.name + '">' + s.name + '</div>' +
-        '<button type="button" id="mute-' + i + '" class="btn-ms ' + (s.muted ? "muted" : "") + '" onclick="toggleMute(' + i + ')">M</button>' +
-        '<button type="button" id="solo-' + i + '" class="btn-ms ' + (s.soloed ? "soloed" : "") + '" onclick="toggleSolo(' + i + ')">S</button>' +
-        '<input type="range" min="0" max="1.3" step="0.02" value="' + s.volume + '" oninput="setVolume(' + i + ', this.value)" />';
+        '<div class="stem-info">' +
+          iconSvg +
+          '<span class="stem-name ' + (s.isOriginal ? "is-original" : "") + '" title="' + s.name + '">' + s.name + '</span>' +
+        '</div>' +
+        '<input type="range" min="0" max="1.3" step="0.02" value="' + s.volume + '" oninput="setVolume(' + i + ', this.value)" />' +
+        '<button type="button" id="solo-' + i + '" class="ms-btn ' + (s.soloed ? "soloed" : "") + '" onclick="toggleSolo(' + i + ')">S</button>' +
+        '<button type="button" id="mute-' + i + '" class="ms-btn ' + (s.muted ? "muted" : "") + '" onclick="toggleMute(' + i + ')">M</button>';
       container.appendChild(row);
     });
 
     var metroRow = document.createElement("div");
     metroRow.className = "stem-row";
     metroRow.innerHTML =
-      '<div class="stem-name is-metro">Claqueta</div>' +
-      '<button type="button" id="metroToggleBtn" class="btn-ms ' + (metroEnabled ? "soloed" : "") + '" style="grid-column: span 2" onclick="toggleMetronome()">' + (metroEnabled ? "ON" : "OFF") + '</button>' +
-      '<input type="range" min="0" max="1" step="0.05" value="' + metroVolume + '" oninput="metroVolume = parseFloat(this.value)" />';
+      '<div class="stem-info">' +
+        ICONS["Claqueta"] +
+        '<span class="stem-name is-metro">Claqueta</span>' +
+      '</div>' +
+      '<input type="range" min="0" max="1" step="0.05" value="' + metroVolume + '" oninput="metroVolume = parseFloat(this.value)" />' +
+      '<button type="button" id="metroToggleBtn" class="ms-btn ' + (metroEnabled ? "soloed" : "") + '" style="grid-column: span 2; width: 100%" onclick="toggleMetronome()">' + (metroEnabled ? "ON" : "OFF") + '</button>';
     container.appendChild(metroRow);
   }
 
@@ -1089,7 +1318,7 @@
   function toggleCountIn() {
     countInEnabled = !countInEnabled;
     var btn = document.getElementById("btnCountIn");
-    btn.classList.toggle("active-green", countInEnabled);
+    btn.classList.toggle("active-state", countInEnabled);
   }
 
   function updateMixGains() {
@@ -1133,7 +1362,7 @@
 
   function runCountInAndPlay() {
     isCountingIn = true;
-    document.getElementById("btnPlay").textContent = "1 - 2 - 3 - 4";
+    setPlayIcon(true);
     var effectiveBpm = baseBpm * currentTempo;
     var beatMs = (60 / effectiveBpm) * 1000;
 
@@ -1162,7 +1391,7 @@
     }
     stopNativeSources();
     isPlaying = false;
-    document.getElementById("btnPlay").textContent = "Reproduir";
+    setPlayIcon(false);
     cancelAnimationFrame(animFrameId);
   }
 
@@ -1172,7 +1401,7 @@
     isPlaying = false;
     savedOffset = loopA !== null ? loopA : 0;
     lastPlayedBeatIndex = -1;
-    document.getElementById("btnPlay").textContent = "Reproduir";
+    setPlayIcon(false);
     document.getElementById("seekBar").value = savedOffset;
     document.getElementById("timeCurrent").textContent = formatTime(savedOffset);
     cancelAnimationFrame(animFrameId);
@@ -1192,7 +1421,7 @@
 
   function changePitch(delta, reset) {
     currentPitch = reset ? 0 : Math.max(-12, Math.min(12, currentPitch + delta));
-    document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch;
+    document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch + " st";
     if (audioCtx) applyLiveRateAndPitch();
     updateChordDisplay(getCurrentPosition());
   }
@@ -1210,7 +1439,7 @@
   function changeBpm(delta) {
     baseBpm = Math.max(40, Math.min(240, baseBpm + delta));
     document.getElementById("bpmVal").textContent = baseBpm;
-    document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+    document.getElementById("bpmBadge").textContent = baseBpm + " BPM";
   }
 
   function tapBpm() {
@@ -1223,7 +1452,7 @@
       var avgMs = intervals.reduce(function(a, b) { return a + b; }, 0) / intervals.length;
       baseBpm = Math.round(60000 / avgMs);
       document.getElementById("bpmVal").textContent = baseBpm;
-      document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+      document.getElementById("bpmBadge").textContent = baseBpm + " BPM";
     }
   }
 
@@ -1231,21 +1460,18 @@
     var pos = getCurrentPosition();
     if (point === "A") {
       loopA = pos;
-      document.getElementById("btnLoopA").classList.add("active-loop");
+      document.getElementById("btnLoopA").classList.add("on");
     } else if (loopA !== null && pos > loopA) {
       loopB = pos;
-      document.getElementById("btnLoopB").classList.add("active-loop");
+      document.getElementById("btnLoopB").classList.add("on");
     }
-    document.getElementById("loopIndicator").textContent =
-      (loopA !== null ? "A " + formatTime(loopA) + "  " : "") + (loopB !== null ? "B " + formatTime(loopB) : "");
   }
 
   function clearLoop() {
     loopA = null;
     loopB = null;
-    document.getElementById("btnLoopA").classList.remove("active-loop");
-    document.getElementById("btnLoopB").classList.remove("active-loop");
-    document.getElementById("loopIndicator").textContent = "";
+    document.getElementById("btnLoopA").classList.remove("on");
+    document.getElementById("btnLoopB").classList.remove("on");
   }
 
   function getCurrentPosition() {
