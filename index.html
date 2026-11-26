@@ -33,7 +33,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Capçalera i Navegació de 2 Vistes */
     .top-bar {
       display: flex;
       justify-content: space-between;
@@ -196,7 +195,7 @@
       gap: 8px;
     }
 
-    /* Vista 2: Consola (Mixer Protagonista + Acords + Controls) */
+    /* Vista 2: Consola */
     .mixer-panel {
       padding: 14px 12px;
     }
@@ -245,7 +244,6 @@
       border-color: var(--solo);
     }
 
-    /* Sliders estilitzats d'estudi */
     input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
@@ -270,7 +268,6 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.6);
     }
 
-    /* Secció compacta d'Acords i Temps */
     .harmony-bar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -337,7 +334,6 @@
     .loop-btns { display: flex; gap: 6px; }
     .loop-btns button { padding: 5px 10px; font-size: 0.76rem; }
 
-    /* Controls de Tonalitat, Velocitat i BPM */
     .params-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -372,7 +368,6 @@
       font-size: 0.76rem;
     }
 
-    /* Barra de transport inferior */
     .transport-bar {
       position: fixed;
       bottom: 0;
@@ -416,16 +411,14 @@
     </div>
   </div>
 
-  <!-- Navegació de 2 pàgines -->
   <div class="nav-tabs">
     <button type="button" id="tab-console" class="nav-btn active" onclick="switchTab('console')">Consola</button>
     <button type="button" id="tab-browser" class="nav-btn" onclick="switchTab('browser')">Biblioteca</button>
   </div>
 
-  <!-- PÀGINA 1: CONSOLA (MIXER PROTAGONISTA + ACORDS + CONTROLS) -->
+  <!-- PÀGINA 1: CONSOLA -->
   <div id="view-console" class="view-section active">
     
-    <!-- Bloc Principal: Mesclador -->
     <div class="panel mixer-panel">
       <div class="panel-label">
         <span>Mesclador de pistes</span>
@@ -438,7 +431,6 @@
       </div>
     </div>
 
-    <!-- Bloc d'Harmonia, Temps i Bucle -->
     <div class="panel">
       <div class="harmony-bar">
         <div class="chord-block">
@@ -473,7 +465,6 @@
       </div>
     </div>
 
-    <!-- Bloc d'Ajustos Globals -->
     <div class="panel">
       <div class="params-grid">
         <div class="param-box">
@@ -508,7 +499,7 @@
 
   </div>
 
-  <!-- PÀGINA 2: NAVEGADOR DE BIBLIOTECA -->
+  <!-- PÀGINA 2: BIBLIOTECA -->
   <div id="view-browser" class="view-section">
     <div class="panel">
       <div class="browser-bar">
@@ -706,7 +697,6 @@
     browseFolder(prevId, true);
   }
 
-  // Detecta el nom en castellà o anglès i el tradueix al català
   function translateInstrumentName(rawName) {
     var lower = rawName.toLowerCase();
     if (/voces|voz|vocal|veus|veu/.test(lower)) return { label: "Veus", isOriginal: false, isDrum: false, order: 1 };
@@ -794,7 +784,6 @@
         };
       });
 
-      // Ordena lògicament: Veus, Bateria, Baix, Guitarra, Piano, Altres, Original
       stemsData.sort(function(a, b) {
         return a.order - b.order;
       });
@@ -825,11 +814,17 @@
       document.getElementById("activeSongHeader").textContent = currentFolderTitle;
       setStatus("");
 
-      // Obre directament la Consola amb el mesclador protagonista
       switchTab("console");
     } catch (err) {
       setStatus("Error carregant l'àudio: " + err.message);
     }
+  }
+
+  // Factor de velocitat real tenint en compte el transpose (compatible al 100% amb Safari iOS)
+  function getEffectiveRate(isDrum) {
+    if (isDrum) return currentTempo;
+    var pitchRatio = Math.pow(2, currentPitch / 12);
+    return currentTempo * pitchRatio;
   }
 
   function startNativeSources(offsetSec) {
@@ -837,19 +832,11 @@
     ensureAudioContext();
 
     var now = audioCtx.currentTime + 0.03;
-    var pitchRatio = Math.pow(2, currentPitch / 12);
 
     stemsData.forEach(function(s) {
       var src = audioCtx.createBufferSource();
       src.buffer = s.buffer;
-
-      if (s.isDrum) {
-        src.playbackRate.value = currentTempo;
-        if (src.detune) src.detune.value = 0;
-      } else {
-        src.playbackRate.value = currentTempo / pitchRatio;
-        if (src.detune) src.detune.value = currentPitch * 100;
-      }
+      src.playbackRate.value = getEffectiveRate(s.isDrum);
 
       src.connect(s.gainNode);
       var safeOffset = Math.max(0, Math.min(s.buffer.duration - 0.05, offsetSec));
@@ -879,16 +866,9 @@
 
   function applyLiveRateAndPitch() {
     if (!isPlaying) return;
-    var pitchRatio = Math.pow(2, currentPitch / 12);
     stemsData.forEach(function(s) {
       if (!s.sourceNode) return;
-      if (s.isDrum) {
-        s.sourceNode.playbackRate.value = currentTempo;
-        if (s.sourceNode.detune) s.sourceNode.detune.value = 0;
-      } else {
-        s.sourceNode.playbackRate.value = currentTempo / pitchRatio;
-        if (s.sourceNode.detune) s.sourceNode.detune.value = currentPitch * 100;
-      }
+      s.sourceNode.playbackRate.value = getEffectiveRate(s.isDrum);
     });
   }
 
@@ -929,7 +909,6 @@
       container.appendChild(row);
     });
 
-    // Metrònom integrat al final del mesclador
     var metroRow = document.createElement("div");
     metroRow.className = "stem-row";
     metroRow.innerHTML =
@@ -994,7 +973,7 @@
   function runCountInAndPlay() {
     isCountingIn = true;
     document.getElementById("btnPlay").textContent = "1 - 2 - 3 - 4";
-    var effectiveBpm = baseBpm * currentTempo;
+    var effectiveBpm = baseBpm * getEffectiveRate(false);
     var beatMs = (60 / effectiveBpm) * 1000;
 
     for (var i = 0; i < 4; i++) {
@@ -1051,6 +1030,10 @@
   });
 
   function changePitch(delta, reset) {
+    if (isPlaying) {
+      savedOffset = getCurrentPosition();
+      playStartTime = audioCtx.currentTime;
+    }
     currentPitch = reset ? 0 : Math.max(-12, Math.min(12, currentPitch + delta));
     document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch;
     applyLiveRateAndPitch();
@@ -1110,7 +1093,7 @@
 
   function getCurrentPosition() {
     if (!isPlaying || !audioCtx) return savedOffset;
-    var elapsed = Math.max(0, audioCtx.currentTime - playStartTime) * currentTempo;
+    var elapsed = Math.max(0, audioCtx.currentTime - playStartTime) * getEffectiveRate(false);
     return savedOffset + elapsed;
   }
 
@@ -1128,15 +1111,20 @@
       return;
     }
 
-    var beatDuration = 60 / baseBpm;
-    var adjustedPos = Math.max(0, pos - firstBeatOffset);
-    var currentBeatIdx = Math.floor(adjustedPos / beatDuration);
+    // Només activa la claqueta i els punts de compàs a partir del primer cop de so real
+    if (pos >= firstBeatOffset) {
+      var beatDuration = 60 / baseBpm;
+      var adjustedPos = pos - firstBeatOffset;
+      var currentBeatIdx = Math.floor(adjustedPos / beatDuration);
 
-    if (currentBeatIdx !== lastPlayedBeatIndex) {
-      lastPlayedBeatIndex = currentBeatIdx;
-      var beatInBar = currentBeatIdx % 4;
-      highlightBeatDot(beatInBar);
-      if (metroEnabled) playClick(beatInBar === 0);
+      if (currentBeatIdx !== lastPlayedBeatIndex) {
+        lastPlayedBeatIndex = currentBeatIdx;
+        var beatInBar = currentBeatIdx % 4;
+        highlightBeatDot(beatInBar);
+        if (metroEnabled) playClick(beatInBar === 0);
+      }
+    } else {
+      highlightBeatDot(-1);
     }
 
     document.getElementById("seekBar").value = pos;
@@ -1157,28 +1145,47 @@
     return m + ":" + (s < 10 ? "0" : "") + s;
   }
 
+  // Detecta el BPM i el segon exacte del primer impacte real de so (ignorant el silenci inicial)
   function detectBpmFromBuffers(sources) {
     var drumStem = sources.find(function(b) { return b.isDrum; }) || sources[0];
     var buffer = drumStem.buffer;
     var data = buffer.getChannelData(0);
     var sr = buffer.sampleRate;
 
-    var maxSamples = Math.min(data.length, sr * 45);
-    var hop = Math.floor(sr * 0.01);
+    var maxSamples = Math.min(data.length, sr * 50);
+    var hop = Math.floor(sr * 0.005); // Resolució fina de 5ms
     var env = [];
     for (var i = 0; i < maxSamples; i += hop) {
       var sum = 0;
-      for (var j = 0; j < hop && i + j < maxSamples; j++) sum += Math.abs(data[i + j]);
-      env.push(sum / hop);
+      for (var j = 0; j < hop && i + j < maxSamples; j++) {
+        var v = Math.abs(data[i + j]);
+        if (v > sum) sum = v; // Pic màxim de cada finestra de 5ms
+      }
+      env.push(sum);
     }
+
+    // Troba el primer pic real que superi el 15% del pic màxim global (evita el soroll de fons)
+    var globalPeak = 0;
+    for (var p = 0; p < env.length; p++) {
+      if (env[p] > globalPeak) globalPeak = env[p];
+    }
+    var soundThreshold = globalPeak * 0.15;
+    var firstSoundFrame = 0;
+    for (var f = 0; f < env.length; f++) {
+      if (env[f] >= soundThreshold) {
+        firstSoundFrame = f;
+        break;
+      }
+    }
+    var exactFirstSoundSec = firstSoundFrame * 0.005;
 
     var onset = env.map(function(v, i) { return i > 0 ? Math.max(0, v - env[i - 1]) : 0; });
 
     var bestBpm = 120, bestCorr = -1;
     for (var bpm = 70; bpm <= 165; bpm++) {
-      var lag = Math.round((60 / bpm) / 0.01);
+      var lag = Math.round((60 / bpm) / 0.005);
       var corr = 0;
-      for (var k = 0; k < onset.length - lag; k++) {
+      for (var k = firstSoundFrame; k < onset.length - lag; k++) {
         corr += onset[k] * onset[k + lag];
       }
       if (corr > bestCorr) {
@@ -1187,11 +1194,7 @@
       }
     }
 
-    var threshold = Math.max.apply(null, onset) * 0.35;
-    var firstIdx = onset.findIndex(function(v) { return v > threshold; });
-    var offset = firstIdx > 0 ? (firstIdx * 0.01) % (60 / bestBpm) : 0;
-
-    return { bpm: bestBpm, offset: offset };
+    return { bpm: bestBpm, offset: exactFirstSoundSec };
   }
 
   function detectChordsFromBuffers(sources) {
