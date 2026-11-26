@@ -146,7 +146,6 @@
     .row { display: flex; gap: 8px; align-items: center; }
     .grow { flex: 1; min-width: 0; }
 
-    /* Vista 1: Navegador */
     .browser-bar {
       display: flex;
       justify-content: space-between;
@@ -195,7 +194,6 @@
       gap: 8px;
     }
 
-    /* Vista 2: Consola */
     .mixer-panel {
       padding: 14px 12px;
     }
@@ -568,38 +566,63 @@
 
   var NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
 
-  // Codi del processador AudioWorklet (Pitch-Shifter en temps real sense alterar la velocitat)
+  // Processador WSOLA d'alta fidelitat amb alineació de fase (sense cancel·lació de greus ni trèmolo)
   var WORKLET_CODE = `
-    class GranularPitchShifter extends AudioWorkletProcessor {
+    class WsolaPitchShifter extends AudioWorkletProcessor {
       static get parameterDescriptors() {
         return [{ name: 'pitchRatio', defaultValue: 1.0, minValue: 0.25, maxValue: 4.0 }];
       }
       constructor() {
         super();
-        this.bufSize = 8192;
+        this.bufSize = 65536;
         this.mask = this.bufSize - 1;
         this.ringL = new Float32Array(this.bufSize);
         this.ringR = new Float32Array(this.bufSize);
         this.writeIdx = 0;
 
-        this.winSize = 2048;
-        this.halfWin = 1024;
+        this.winSize = 4096;
+        this.halfWin = 2048;
         this.hann = new Float32Array(this.winSize);
         for (let i = 0; i < this.winSize; i++) {
-          this.hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (this.winSize - 1)));
+          this.hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / this.winSize));
         }
 
         this.phaseA = 0;
         this.phaseB = this.halfWin;
         this.readA = 0;
         this.readB = 0;
+        this.wasBypass = true;
       }
 
       readInterp(ring, pos) {
-        const i0 = Math.floor(pos) & this.mask;
+        const p = ((pos % this.bufSize) + this.bufSize) % this.bufSize;
+        const i0 = p | 0;
         const i1 = (i0 + 1) & this.mask;
-        const frac = pos - Math.floor(pos);
+        const frac = p - i0;
         return ring[i0] + (ring[i1] - ring[i0]) * frac;
+      }
+
+      // Busca el desplaçament òptim (correlació de fase) perquè les dues finestres sumin en fase i no perdin volum
+      findBestPhaseOffset(targetRead, refRead, ratio) {
+        let bestOffset = 0;
+        let bestCorr = -1e18;
+        const searchRange = 384;
+        const step = 4;
+        const corrLen = 256;
+
+        for (let delta = -searchRange; delta <= searchRange; delta += step) {
+          let corr = 0;
+          for (let k = 0; k < corrLen; k += 4) {
+            const sNew = this.readInterp(this.ringL, targetRead + delta + k * ratio);
+            const sRef = this.readInterp(this.ringL, refRead + k * ratio);
+            corr += sNew * sRef;
+          }
+          if (corr > bestCorr) {
+            bestCorr = corr;
+            bestOffset = delta;
+          }
+        }
+        return bestOffset;
       }
 
       process(inputs, outputs, parameters) {
@@ -614,7 +637,6 @@
         const ratio = parameters.pitchRatio[0];
         const len = inL.length;
 
-        // Bypass directe i transparent quan el to és 0
         if (Math.abs(ratio - 1.0) < 0.001) {
           for (let i = 0; i < len; i++) {
             this.ringL[this.writeIdx] = inL[i];
@@ -623,12 +645,22 @@
             outL[i] = inL[i];
             outR[i] = inR[i];
           }
-          this.phaseA = 0;
-          this.phaseB = this.halfWin;
+          this.wasBypass = true;
           return true;
         }
 
-        const safeDelay = ratio > 1.0 ? Math.ceil(this.winSize * (ratio - 1.0)) + 256 : 512;
+        // Retard de seguretat ample perquè el punter de lectura mai atrapi el d'escriptura
+        const baseDelay = ratio > 1.0
+          ? Math.ceil(this.winSize * (ratio - 1.0)) + 2048
+          : 2048;
+
+        if (this.wasBypass) {
+          this.phaseA = 0;
+          this.phaseB = this.halfWin;
+          this.readA = (this.writeIdx - baseDelay + this.bufSize) & this.mask;
+          this.readB = (this.writeIdx - baseDelay + this.bufSize) & this.mask;
+          this.wasBypass = false;
+        }
 
         for (let i = 0; i < len; i++) {
           this.ringL[this.writeIdx] = inL[i];
@@ -636,11 +668,16 @@
 
           if (this.phaseA >= this.winSize) {
             this.phaseA = 0;
-            this.readA = (this.writeIdx - safeDelay + this.bufSize) & this.mask;
+            const nominal = (this.writeIdx - baseDelay + this.bufSize) & this.mask;
+            const align = this.findBestPhaseOffset(nominal, this.readB, ratio);
+            this.readA = (nominal + align + this.bufSize) % this.bufSize;
           }
+
           if (this.phaseB >= this.winSize) {
             this.phaseB = 0;
-            this.readB = (this.writeIdx - safeDelay + this.bufSize) & this.mask;
+            const nominal = (this.writeIdx - baseDelay + this.bufSize) & this.mask;
+            const align = this.findBestPhaseOffset(nominal, this.readA, ratio);
+            this.readB = (nominal + align + this.bufSize) % this.bufSize;
           }
 
           const wA = this.hann[this.phaseA];
@@ -663,7 +700,7 @@
         return true;
       }
     }
-    registerProcessor('granular-pitch-shifter', GranularPitchShifter);
+    registerProcessor('wsola-pitch-shifter', WsolaPitchShifter);
   `;
 
   function switchTab(tabName) {
@@ -698,7 +735,7 @@
         var blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
         var workletUrl = URL.createObjectURL(blob);
         await audioCtx.audioWorklet.addModule(workletUrl);
-        pitchWorkletNode = new AudioWorkletNode(audioCtx, "granular-pitch-shifter", {
+        pitchWorkletNode = new AudioWorkletNode(audioCtx, "wsola-pitch-shifter", {
           numberOfInputs: 1,
           numberOfOutputs: 1,
           outputChannelCount: [2]
@@ -885,7 +922,6 @@
         var gainNode = audioCtx.createGain();
         gainNode.gain.value = info.isOriginal ? 0 : 1.0;
 
-        // La bateria va directa a la sortida perquè no canviï de to; la resta passa pel PitchShifter
         if (info.isDrum || !workletReady || !pitchWorkletNode) {
           gainNode.connect(audioCtx.destination);
         } else {
@@ -956,7 +992,6 @@
     stemsData.forEach(function(s) {
       var src = audioCtx.createBufferSource();
       src.buffer = s.buffer;
-      // Ara playbackRate controla EXCLUSIVAMENT la velocitat (currentTempo)
       src.playbackRate.value = currentTempo;
 
       src.connect(s.gainNode);
