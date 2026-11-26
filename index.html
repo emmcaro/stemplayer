@@ -1,1 +1,1395 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>StemStudio</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: #121215;
+      --surface-elevated: #1c1c21;
+      --border: #27272a;
+      --primary: #e4e4e7;
+      --accent: #38bdf8;
+      --mute: #ef4444;
+      --solo: #f59e0b;
+      --loop: #eab308;
+      --green: #10b981;
+      --text: #fafafa;
+      --muted: #71717a;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 12px;
+      padding-bottom: 84px;
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+      font-variant-numeric: tabular-nums;
+    }
 
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    .brand {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .song-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      text-align: right;
+    }
+    .nav-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--surface);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .nav-btn {
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.84rem;
+      letter-spacing: 0.02em;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .nav-btn.active {
+      background: var(--surface-elevated);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .panel-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type="url"], button {
+      font-size: 0.85rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text);
+      padding: 8px 12px;
+      font-weight: 500;
+    }
+    button { cursor: pointer; transition: opacity 0.15s, background 0.15s; }
+    button:active { opacity: 0.8; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+    button.btn-primary {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+      font-weight: 700;
+    }
+    button.btn-load {
+      background: var(--green);
+      color: #052e16;
+      border-color: var(--green);
+      font-weight: 700;
+    }
+    button.active-loop {
+      background: var(--loop);
+      color: #09090b;
+      border-color: var(--loop);
+      font-weight: 700;
+    }
+    button.active-green {
+      background: var(--green);
+      color: #052e16;
+      border-color: var(--green);
+      font-weight: 700;
+    }
+
+    .row { display: flex; gap: 8px; align-items: center; }
+    .grow { flex: 1; min-width: 0; }
+
+    /* Vista 1: Navegador */
+    .browser-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .folder-path {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .folder-list {
+      max-height: 60vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .folder-item {
+      background: var(--bg);
+      padding: 11px 12px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+    .folder-item:active { background: var(--surface-elevated); }
+    .stems-ready-box {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Vista 2: Consola */
+    .mixer-panel {
+      padding: 14px 12px;
+    }
+    .stem-row {
+      display: grid;
+      grid-template-columns: 82px 36px 36px 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .stem-row:last-child { border-bottom: none; padding-bottom: 2px; }
+    .stem-name {
+      font-weight: 600;
+      font-size: 0.88rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text);
+    }
+    .stem-name.is-original {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .stem-name.is-metro {
+      color: var(--accent);
+    }
+    .btn-ms {
+      padding: 7px 0;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: var(--surface-elevated);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      text-align: center;
+    }
+    .btn-ms.muted {
+      background: var(--mute);
+      color: #fff;
+      border-color: var(--mute);
+    }
+    .btn-ms.soloed {
+      background: var(--solo);
+      color: #09090b;
+      border-color: var(--solo);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      background: transparent;
+      height: 28px;
+      margin: 0;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--text);
+      margin-top: -6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+
+    .harmony-bar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+    .chord-block { text-align: left; }
+    .chord-block.right { text-align: right; }
+    .chord-tag {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .chord-current {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1.15;
+    }
+    .chord-next {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1.2;
+    }
+    .beat-dots {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      padding: 0 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: transform 0.06s, background 0.06s;
+    }
+    .dot.active { background: var(--text); transform: scale(1.25); }
+    .dot.accent { background: var(--accent); transform: scale(1.35); }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .time-code {
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-width: 34px;
+    }
+    .loop-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .loop-btns { display: flex; gap: 6px; }
+    .loop-btns button { padding: 5px 10px; font-size: 0.76rem; }
+
+    .params-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .param-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    .param-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .param-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 4px 0 6px 0;
+    }
+    .param-btns {
+      display: flex;
+      justify-content: center;
+      gap: 3px;
+    }
+    .param-btns button {
+      padding: 5px 7px;
+      font-size: 0.76rem;
+    }
+
+    .transport-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      justify-content: center;
+      z-index: 50;
+    }
+    .transport-inner {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .status-msg {
+      font-size: 0.8rem;
+      color: var(--accent);
+      margin-top: 8px;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <span class="brand">StemStudio</span>
+    <span id="activeSongHeader" class="song-title">Cap pista carregada</span>
+    <button type="button" style="padding:5px 9px;font-size:0.75rem" onclick="toggleConfig()">Config</button>
+  </div>
+
+  <div id="configCard" class="panel">
+    <div class="panel-label">Connexió Google Apps Script</div>
+    <div class="row">
+      <input id="scriptUrlInput" class="grow" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button type="button" class="btn-primary" onclick="saveUrlAndBrowse()">Connectar</button>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button type="button" id="tab-console" class="nav-btn active" onclick="switchTab('console')">Consola</button>
+    <button type="button" id="tab-browser" class="nav-btn" onclick="switchTab('browser')">Biblioteca</button>
+  </div>
+
+  <!-- PÀGINA 1: CONSOLA -->
+  <div id="view-console" class="view-section active">
+    
+    <div class="panel mixer-panel">
+      <div class="panel-label">
+        <span>Mesclador de pistes</span>
+        <span id="mixerBpmBadge" style="color:var(--text)">-- BPM</span>
+      </div>
+      <div id="mixerContainer">
+        <div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:28px 12px">
+          Obre la pestanya Biblioteca per seleccionar una cançó.
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="harmony-bar">
+        <div class="chord-block">
+          <div class="chord-tag">Actual</div>
+          <div id="chordCurrent" class="chord-current">--</div>
+        </div>
+        <div class="beat-dots">
+          <div id="dot-0" class="dot"></div>
+          <div id="dot-1" class="dot"></div>
+          <div id="dot-2" class="dot"></div>
+          <div id="dot-3" class="dot"></div>
+        </div>
+        <div class="chord-block right">
+          <div class="chord-tag">Següent</div>
+          <div id="chordNext" class="chord-next">--</div>
+        </div>
+      </div>
+
+      <div class="time-row">
+        <span id="timeCurrent" class="time-code">0:00</span>
+        <input id="seekBar" class="grow" type="range" min="0" max="100" value="0" step="0.1" disabled />
+        <span id="timeTotal" class="time-code" style="text-align:right">0:00</span>
+      </div>
+
+      <div class="loop-row">
+        <span id="loopIndicator" style="font-size:0.75rem;color:var(--loop);font-weight:600"></span>
+        <div class="loop-btns">
+          <button type="button" id="btnLoopA" onclick="setLoopPoint('A')" disabled>Inici A</button>
+          <button type="button" id="btnLoopB" onclick="setLoopPoint('B')" disabled>Final B</button>
+          <button type="button" id="btnLoopClear" onclick="clearLoop()" disabled>Netejar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="params-grid">
+        <div class="param-box">
+          <div class="param-title">Tonalitat</div>
+          <div id="pitchVal" class="param-val">0</div>
+          <div class="param-btns">
+            <button type="button" onclick="changePitch(-1)">-1</button>
+            <button type="button" onclick="changePitch(0, true)">0</button>
+            <button type="button" onclick="changePitch(1)">+1</button>
+          </div>
+        </div>
+        <div class="param-box">
+          <div class="param-title">Velocitat</div>
+          <div id="tempoVal" class="param-val">100%</div>
+          <div class="param-btns">
+            <button type="button" onclick="changeTempo(-0.05)">-5%</button>
+            <button type="button" onclick="changeTempo(1, true)">100%</button>
+            <button type="button" onclick="changeTempo(0.05)">+5%</button>
+          </div>
+        </div>
+        <div class="param-box">
+          <div class="param-title">Tempo BPM</div>
+          <div id="bpmVal" class="param-val">120</div>
+          <div class="param-btns">
+            <button type="button" onclick="changeBpm(-1)">-1</button>
+            <button type="button" onclick="tapBpm()">Tap</button>
+            <button type="button" onclick="changeBpm(1)">+1</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PÀGINA 2: BIBLIOTECA -->
+  <div id="view-browser" class="view-section">
+    <div class="panel">
+      <div class="browser-bar">
+        <button type="button" id="btnBack" style="padding:7px 10px" onclick="goBackFolder()" disabled>Enrere</button>
+        <div id="currentFolderName" class="folder-path">Google Drive</div>
+        <button type="button" style="padding:7px 10px" onclick="browseFolder('root')">Inici</button>
+      </div>
+
+      <div id="stemsReadyBox" class="stems-ready-box" style="display:none">
+        <span id="stemsReadyLabel" style="font-size:0.86rem;font-weight:600">Pistes detectades</span>
+        <button type="button" class="btn-load" onclick="loadCurrentFolderStems()">Carregar pistes</button>
+      </div>
+
+      <div id="folderList" class="folder-list">
+        <div style="color:var(--muted);font-size:0.85rem;padding:12px 4px">
+          Configura l'URL de Google Apps Script per explorar les carpetes.
+        </div>
+      </div>
+      <div id="statusText" class="status-msg"></div>
+    </div>
+  </div>
+
+  <!-- BARRA DE TRANSPORT FIXA -->
+  <div class="transport-bar">
+    <div class="transport-inner">
+      <button type="button" onclick="stopPlayback()" id="btnStop" style="padding:11px 14px" disabled>Aturar</button>
+      <button type="button" onclick="toggleCountIn()" id="btnCountIn" style="padding:11px 12px">1-2-3-4</button>
+      <button type="button" class="btn-primary" onclick="togglePlay()" id="btnPlay" style="flex:1;padding:11px;font-size:0.95rem" disabled>Reproduir</button>
+    </div>
+  </div>
+
+<script>
+  window.onerror = function(msg) {
+    var st = document.getElementById("statusText");
+    if (st) st.textContent = "Error: " + msg;
+  };
+
+  var audioCtx = null;
+  var workletReady = false;
+  var pitchWorkletNode = null;
+  var stemsData = [];
+
+  var folderHistory = [];
+  var currentFolderStems = [];
+  var currentFolderTitle = "";
+
+  var isPlaying = false;
+  var isCountingIn = false;
+  var countInEnabled = false;
+  var songDuration = 0;
+  var savedOffset = 0;
+  var playStartTime = 0;
+  var currentPitch = 0;
+  var currentTempo = 1.0;
+  var baseBpm = 120;
+  var firstBeatOffset = 0;
+  var loopA = null;
+  var loopB = null;
+  var chordTimeline = [];
+  var animFrameId = null;
+
+  var metroEnabled = false;
+  var metroVolume = 0.7;
+  var lastPlayedBeatIndex = -1;
+  var tapTimes = [];
+
+  var NOTES = ["Do", "Do#", "Re", "Mib", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "Sib", "Si"];
+
+  // Codi del processador AudioWorklet (Pitch-Shifter en temps real sense alterar la velocitat)
+  var WORKLET_CODE = `
+    class GranularPitchShifter extends AudioWorkletProcessor {
+      static get parameterDescriptors() {
+        return [{ name: 'pitchRatio', defaultValue: 1.0, minValue: 0.25, maxValue: 4.0 }];
+      }
+      constructor() {
+        super();
+        this.bufSize = 8192;
+        this.mask = this.bufSize - 1;
+        this.ringL = new Float32Array(this.bufSize);
+        this.ringR = new Float32Array(this.bufSize);
+        this.writeIdx = 0;
+
+        this.winSize = 2048;
+        this.halfWin = 1024;
+        this.hann = new Float32Array(this.winSize);
+        for (let i = 0; i < this.winSize; i++) {
+          this.hann[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (this.winSize - 1)));
+        }
+
+        this.phaseA = 0;
+        this.phaseB = this.halfWin;
+        this.readA = 0;
+        this.readB = 0;
+      }
+
+      readInterp(ring, pos) {
+        const i0 = Math.floor(pos) & this.mask;
+        const i1 = (i0 + 1) & this.mask;
+        const frac = pos - Math.floor(pos);
+        return ring[i0] + (ring[i1] - ring[i0]) * frac;
+      }
+
+      process(inputs, outputs, parameters) {
+        const input = inputs[0];
+        const output = outputs[0];
+        if (!input || !input[0] || !output || !output[0]) return true;
+
+        const inL = input[0];
+        const inR = input[1] || input[0];
+        const outL = output[0];
+        const outR = output[1] || output[0];
+        const ratio = parameters.pitchRatio[0];
+        const len = inL.length;
+
+        // Bypass directe i transparent quan el to és 0
+        if (Math.abs(ratio - 1.0) < 0.001) {
+          for (let i = 0; i < len; i++) {
+            this.ringL[this.writeIdx] = inL[i];
+            this.ringR[this.writeIdx] = inR[i];
+            this.writeIdx = (this.writeIdx + 1) & this.mask;
+            outL[i] = inL[i];
+            outR[i] = inR[i];
+          }
+          this.phaseA = 0;
+          this.phaseB = this.halfWin;
+          return true;
+        }
+
+        const safeDelay = ratio > 1.0 ? Math.ceil(this.winSize * (ratio - 1.0)) + 256 : 512;
+
+        for (let i = 0; i < len; i++) {
+          this.ringL[this.writeIdx] = inL[i];
+          this.ringR[this.writeIdx] = inR[i];
+
+          if (this.phaseA >= this.winSize) {
+            this.phaseA = 0;
+            this.readA = (this.writeIdx - safeDelay + this.bufSize) & this.mask;
+          }
+          if (this.phaseB >= this.winSize) {
+            this.phaseB = 0;
+            this.readB = (this.writeIdx - safeDelay + this.bufSize) & this.mask;
+          }
+
+          const wA = this.hann[this.phaseA];
+          const wB = this.hann[this.phaseB];
+
+          const sAL = this.readInterp(this.ringL, this.readA);
+          const sAR = this.readInterp(this.ringR, this.readA);
+          const sBL = this.readInterp(this.ringL, this.readB);
+          const sBR = this.readInterp(this.ringR, this.readB);
+
+          outL[i] = sAL * wA + sBL * wB;
+          outR[i] = sAR * wA + sBR * wB;
+
+          this.readA = (this.readA + ratio) % this.bufSize;
+          this.readB = (this.readB + ratio) % this.bufSize;
+          this.phaseA++;
+          this.phaseB++;
+          this.writeIdx = (this.writeIdx + 1) & this.mask;
+        }
+        return true;
+      }
+    }
+    registerProcessor('granular-pitch-shifter', GranularPitchShifter);
+  `;
+
+  function switchTab(tabName) {
+    ["console", "browser"].forEach(function(name) {
+      document.getElementById("tab-" + name).classList.toggle("active", name === tabName);
+      document.getElementById("view-" + name).classList.toggle("active", name === tabName);
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", function() {
+    var saved = localStorage.getItem("stemstudio_url");
+    if (saved) {
+      document.getElementById("scriptUrlInput").value = saved;
+      document.getElementById("configCard").style.display = "none";
+      switchTab("browser");
+      browseFolder("root");
+    } else {
+      switchTab("browser");
+    }
+  });
+
+  async function ensureAudioContext() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
+    if (!workletReady && audioCtx.audioWorklet) {
+      try {
+        var blob = new Blob([WORKLET_CODE], { type: "application/javascript" });
+        var workletUrl = URL.createObjectURL(blob);
+        await audioCtx.audioWorklet.addModule(workletUrl);
+        pitchWorkletNode = new AudioWorkletNode(audioCtx, "granular-pitch-shifter", {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2]
+        });
+        pitchWorkletNode.connect(audioCtx.destination);
+        workletReady = true;
+      } catch (e) {
+        console.warn("AudioWorklet fallback:", e);
+      }
+    }
+  }
+
+  function toggleConfig() {
+    var el = document.getElementById("configCard");
+    el.style.display = (el.style.display === "none") ? "block" : "none";
+  }
+
+  function setStatus(msg) {
+    document.getElementById("statusText").textContent = msg;
+  }
+
+  function saveUrlAndBrowse() {
+    var raw = document.getElementById("scriptUrlInput").value;
+    var url = raw.trim().split("?")[0];
+    if (!url) {
+      setStatus("Introdueix l'URL de Google Apps Script.");
+      return;
+    }
+    localStorage.setItem("stemstudio_url", url);
+    document.getElementById("configCard").style.display = "none";
+    folderHistory = [];
+    browseFolder("root");
+  }
+
+  async function browseFolder(folderId, isGoingBack) {
+    var url = localStorage.getItem("stemstudio_url");
+    if (!url) {
+      setStatus("Falta l'URL de Google Drive.");
+      document.getElementById("configCard").style.display = "block";
+      return;
+    }
+
+    setStatus("Carregant carpeta...");
+    try {
+      var res = await fetch(url + "?action=browse&folderId=" + encodeURIComponent(folderId), {
+        method: "GET",
+        redirect: "follow"
+      });
+      var text = await res.text();
+      var data;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        setStatus("Error de permisos a Google Apps Script.");
+        document.getElementById("configCard").style.display = "block";
+        return;
+      }
+
+      if (data.error) {
+        setStatus("Error: " + data.error);
+        return;
+      }
+
+      if (!isGoingBack) {
+        if (folderId === "root") {
+          folderHistory = ["root"];
+        } else if (folderHistory[folderHistory.length - 1] !== folderId) {
+          folderHistory.push(folderId);
+        }
+      }
+
+      document.getElementById("btnBack").disabled = folderHistory.length <= 1;
+      document.getElementById("currentFolderName").textContent = data.currentName;
+      currentFolderTitle = data.currentName;
+
+      currentFolderStems = (data.stems || []).filter(function(s) {
+        return !/\.wav$/i.test(s.name);
+      });
+
+      var readyBox = document.getElementById("stemsReadyBox");
+      if (currentFolderStems.length > 0) {
+        readyBox.style.display = "flex";
+        document.getElementById("stemsReadyLabel").textContent = currentFolderStems.length + " arxius d'àudio";
+      } else {
+        readyBox.style.display = "none";
+      }
+
+      var listEl = document.getElementById("folderList");
+      listEl.innerHTML = "";
+      if (data.folders.length === 0 && currentFolderStems.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--muted);font-size:0.84rem;padding:10px 4px">Carpeta buida</div>';
+      } else {
+        data.folders.forEach(function(f) {
+          var item = document.createElement("div");
+          item.className = "folder-item";
+          item.innerHTML = '<span>' + f.name + '</span><span style="color:var(--muted)">/</span>';
+          item.onclick = function() { browseFolder(f.id, false); };
+          listEl.appendChild(item);
+        });
+      }
+      setStatus("");
+    } catch (e) {
+      setStatus("Error de connexió: " + e.message);
+      document.getElementById("configCard").style.display = "block";
+    }
+  }
+
+  function goBackFolder() {
+    if (folderHistory.length <= 1) return;
+    folderHistory.pop();
+    var prevId = folderHistory[folderHistory.length - 1];
+    browseFolder(prevId, true);
+  }
+
+  function translateInstrumentName(rawName) {
+    var lower = rawName.toLowerCase();
+    if (/voces|voz|vocal|veus|veu/.test(lower)) return { label: "Veus", isOriginal: false, isDrum: false, order: 1 };
+    if (/bater[ií]a|drum|perc/.test(lower)) return { label: "Bateria", isOriginal: false, isDrum: true, order: 2 };
+    if (/bajo|bass|baix/.test(lower)) return { label: "Baix", isOriginal: false, isDrum: false, order: 3 };
+    if (/guitarra|guitar/.test(lower)) return { label: "Guitarra", isOriginal: false, isDrum: false, order: 4 };
+    if (/piano|keys|teclado|teclat/.test(lower)) return { label: "Piano", isOriginal: false, isDrum: false, order: 5 };
+    if (/otros|other|altres|resto/.test(lower)) return { label: "Altres", isOriginal: false, isDrum: false, order: 6 };
+    return null;
+  }
+
+  function classifyTrackNames(names) {
+    var parsed = names.map(function(name) {
+      return { raw: name, info: translateInstrumentName(name) };
+    });
+
+    var anyInstrumentFound = parsed.some(function(p) { return p.info !== null; });
+
+    return parsed.map(function(p) {
+      if (anyInstrumentFound && p.info === null) {
+        return { displayName: "Original", isOriginal: true, isDrum: false, order: 99 };
+      }
+      if (p.info !== null) {
+        return {
+          displayName: p.info.label,
+          isOriginal: false,
+          isDrum: p.info.isDrum,
+          order: p.info.order
+        };
+      }
+      return { displayName: p.raw, isOriginal: false, isDrum: false, order: 50 };
+    });
+  }
+
+  async function loadCurrentFolderStems() {
+    if (currentFolderStems.length === 0) return;
+    await ensureAudioContext();
+    stopPlayback();
+    clearLoop();
+
+    stemsData.forEach(function(s) {
+      if (s.gainNode) {
+        try { s.gainNode.disconnect(); } catch (e) {}
+      }
+    });
+    stemsData = [];
+
+    var url = localStorage.getItem("stemstudio_url");
+    var completed = 0;
+    var total = currentFolderStems.length;
+    setStatus("Descarregant pistes (0/" + total + ")...");
+
+    try {
+      var promises = currentFolderStems.map(async function(stem) {
+        var res = await fetch(url + "?action=audio&fileId=" + stem.id, { redirect: "follow" });
+        var json = await res.json();
+        var byteRes = await fetch("data:audio/mpeg;base64," + json.data);
+        var arrayBuffer = await byteRes.arrayBuffer();
+        var audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        completed++;
+        setStatus("Descarregant i decodificant (" + completed + "/" + total + ")...");
+        return { rawName: stem.name, buffer: audioBuffer };
+      });
+
+      var results = await Promise.all(promises);
+      var classified = classifyTrackNames(results.map(function(r) { return r.rawName; }));
+
+      stemsData = results.map(function(r, idx) {
+        var info = classified[idx];
+        var gainNode = audioCtx.createGain();
+        gainNode.gain.value = info.isOriginal ? 0 : 1.0;
+
+        // La bateria va directa a la sortida perquè no canviï de to; la resta passa pel PitchShifter
+        if (info.isDrum || !workletReady || !pitchWorkletNode) {
+          gainNode.connect(audioCtx.destination);
+        } else {
+          gainNode.connect(pitchWorkletNode);
+        }
+
+        return {
+          name: info.displayName,
+          order: info.order,
+          buffer: r.buffer,
+          gainNode: gainNode,
+          sourceNode: null,
+          muted: info.isOriginal,
+          soloed: false,
+          volume: 1.0,
+          isDrum: info.isDrum,
+          isOriginal: info.isOriginal
+        };
+      });
+
+      stemsData.sort(function(a, b) {
+        return a.order - b.order;
+      });
+
+      songDuration = Math.max.apply(null, stemsData.map(function(s) { return s.buffer.duration; }));
+      savedOffset = 0;
+
+      document.getElementById("seekBar").max = songDuration;
+      document.getElementById("timeTotal").textContent = formatTime(songDuration);
+
+      setStatus("Analitzant tempo i harmonia...");
+      await new Promise(function(r) { setTimeout(r, 30); });
+
+      var onlyStems = stemsData.filter(function(s) { return !s.isOriginal; });
+      var analysisSources = onlyStems.length > 0 ? onlyStems : stemsData;
+
+      var tempoInfo = detectBpmFromBuffers(analysisSources);
+      baseBpm = tempoInfo.bpm;
+      firstBeatOffset = tempoInfo.offset;
+      document.getElementById("bpmVal").textContent = baseBpm;
+      document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+
+      chordTimeline = detectChordsFromBuffers(analysisSources);
+
+      renderMixer();
+      enableControls(true);
+      updateChordDisplay(0);
+      document.getElementById("activeSongHeader").textContent = currentFolderTitle;
+      setStatus("");
+
+      switchTab("console");
+    } catch (err) {
+      setStatus("Error carregant l'àudio: " + err.message);
+    }
+  }
+
+  async function startNativeSources(offsetSec) {
+    stopNativeSources();
+    await ensureAudioContext();
+
+    var now = audioCtx.currentTime + 0.03;
+    var pitchRatio = Math.pow(2, currentPitch / 12);
+
+    if (workletReady && pitchWorkletNode) {
+      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(pitchRatio, now);
+    }
+
+    stemsData.forEach(function(s) {
+      var src = audioCtx.createBufferSource();
+      src.buffer = s.buffer;
+      // Ara playbackRate controla EXCLUSIVAMENT la velocitat (currentTempo)
+      src.playbackRate.value = currentTempo;
+
+      src.connect(s.gainNode);
+      var safeOffset = Math.max(0, Math.min(s.buffer.duration - 0.05, offsetSec));
+      src.start(now, safeOffset);
+      s.sourceNode = src;
+    });
+
+    savedOffset = offsetSec;
+    playStartTime = now;
+    lastPlayedBeatIndex = -1;
+    isPlaying = true;
+    document.getElementById("btnPlay").textContent = "Pausa";
+    updateLoopUI();
+  }
+
+  function stopNativeSources() {
+    stemsData.forEach(function(s) {
+      if (s.sourceNode) {
+        try {
+          s.sourceNode.stop();
+          s.sourceNode.disconnect();
+        } catch (e) {}
+        s.sourceNode = null;
+      }
+    });
+  }
+
+  function applyLiveRateAndPitch() {
+    var pitchRatio = Math.pow(2, currentPitch / 12);
+    if (workletReady && pitchWorkletNode) {
+      pitchWorkletNode.parameters.get("pitchRatio").setValueAtTime(pitchRatio, audioCtx.currentTime);
+    }
+    if (!isPlaying) return;
+    stemsData.forEach(function(s) {
+      if (s.sourceNode) {
+        s.sourceNode.playbackRate.value = currentTempo;
+      }
+    });
+  }
+
+  function playClick(isAccent) {
+    if (!audioCtx) return;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(isAccent ? 1050 : 750, audioCtx.currentTime);
+    gain.gain.setValueAtTime(metroVolume * 0.6, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.055);
+  }
+
+  function highlightBeatDot(beatInBar) {
+    for (var i = 0; i < 4; i++) {
+      var dot = document.getElementById("dot-" + i);
+      dot.classList.remove("active", "accent");
+      if (i === beatInBar) dot.classList.add(i === 0 ? "accent" : "active");
+    }
+  }
+
+  function renderMixer() {
+    var container = document.getElementById("mixerContainer");
+    container.innerHTML = "";
+
+    stemsData.forEach(function(s, i) {
+      var row = document.createElement("div");
+      row.className = "stem-row";
+      row.innerHTML =
+        '<div class="stem-name ' + (s.isOriginal ? "is-original" : "") + '" title="' + s.name + '">' + s.name + '</div>' +
+        '<button type="button" id="mute-' + i + '" class="btn-ms ' + (s.muted ? "muted" : "") + '" onclick="toggleMute(' + i + ')">M</button>' +
+        '<button type="button" id="solo-' + i + '" class="btn-ms ' + (s.soloed ? "soloed" : "") + '" onclick="toggleSolo(' + i + ')">S</button>' +
+        '<input type="range" min="0" max="1.3" step="0.02" value="' + s.volume + '" oninput="setVolume(' + i + ', this.value)" />';
+      container.appendChild(row);
+    });
+
+    var metroRow = document.createElement("div");
+    metroRow.className = "stem-row";
+    metroRow.innerHTML =
+      '<div class="stem-name is-metro">Claqueta</div>' +
+      '<button type="button" id="metroToggleBtn" class="btn-ms ' + (metroEnabled ? "soloed" : "") + '" style="grid-column: span 2" onclick="toggleMetronome()">' + (metroEnabled ? "ON" : "OFF") + '</button>' +
+      '<input type="range" min="0" max="1" step="0.05" value="' + metroVolume + '" oninput="metroVolume = parseFloat(this.value)" />';
+    container.appendChild(metroRow);
+  }
+
+  function toggleMetronome() {
+    metroEnabled = !metroEnabled;
+    var btn = document.getElementById("metroToggleBtn");
+    btn.textContent = metroEnabled ? "ON" : "OFF";
+    btn.classList.toggle("soloed", metroEnabled);
+  }
+
+  function toggleCountIn() {
+    countInEnabled = !countInEnabled;
+    var btn = document.getElementById("btnCountIn");
+    btn.classList.toggle("active-green", countInEnabled);
+  }
+
+  function updateMixGains() {
+    var anySolo = stemsData.some(function(s) { return s.soloed; });
+    stemsData.forEach(function(s, i) {
+      document.getElementById("mute-" + i).classList.toggle("muted", s.muted);
+      document.getElementById("solo-" + i).classList.toggle("soloed", s.soloed);
+      var active = anySolo ? s.soloed : !s.muted;
+      if (s.gainNode) {
+        s.gainNode.gain.setTargetAtTime(active ? s.volume : 0, audioCtx.currentTime, 0.015);
+      }
+    });
+  }
+
+  function toggleMute(i) {
+    stemsData[i].muted = !stemsData[i].muted;
+    if (stemsData[i].muted) stemsData[i].soloed = false;
+    updateMixGains();
+  }
+
+  function toggleSolo(i) {
+    stemsData[i].soloed = !stemsData[i].soloed;
+    if (stemsData[i].soloed) stemsData[i].muted = false;
+    updateMixGains();
+  }
+
+  function setVolume(i, val) {
+    stemsData[i].volume = parseFloat(val);
+    updateMixGains();
+  }
+
+  async function togglePlay() {
+    await ensureAudioContext();
+    if (isPlaying || isCountingIn) {
+      pausePlayback();
+    } else {
+      if (countInEnabled) runCountInAndPlay();
+      else startNativeSources(savedOffset);
+    }
+  }
+
+  function runCountInAndPlay() {
+    isCountingIn = true;
+    document.getElementById("btnPlay").textContent = "1 - 2 - 3 - 4";
+    var effectiveBpm = baseBpm * currentTempo;
+    var beatMs = (60 / effectiveBpm) * 1000;
+
+    for (var i = 0; i < 4; i++) {
+      (function(idx) {
+        setTimeout(function() {
+          if (!isCountingIn) return;
+          playClick(idx === 0);
+          highlightBeatDot(idx);
+          document.getElementById("chordCurrent").textContent = idx + 1;
+        }, idx * beatMs);
+      })(i);
+    }
+
+    setTimeout(function() {
+      if (!isCountingIn) return;
+      isCountingIn = false;
+      startNativeSources(savedOffset);
+    }, 4 * beatMs);
+  }
+
+  function pausePlayback() {
+    isCountingIn = false;
+    if (isPlaying) {
+      savedOffset = getCurrentPosition();
+    }
+    stopNativeSources();
+    isPlaying = false;
+    document.getElementById("btnPlay").textContent = "Reproduir";
+    cancelAnimationFrame(animFrameId);
+  }
+
+  function stopPlayback() {
+    isCountingIn = false;
+    stopNativeSources();
+    isPlaying = false;
+    savedOffset = loopA !== null ? loopA : 0;
+    lastPlayedBeatIndex = -1;
+    document.getElementById("btnPlay").textContent = "Reproduir";
+    document.getElementById("seekBar").value = savedOffset;
+    document.getElementById("timeCurrent").textContent = formatTime(savedOffset);
+    cancelAnimationFrame(animFrameId);
+    updateChordDisplay(savedOffset);
+  }
+
+  document.getElementById("seekBar").addEventListener("input", function(e) {
+    var val = parseFloat(e.target.value);
+    document.getElementById("timeCurrent").textContent = formatTime(val);
+    updateChordDisplay(val);
+    if (isPlaying) {
+      startNativeSources(val);
+    } else {
+      savedOffset = val;
+    }
+  });
+
+  function changePitch(delta, reset) {
+    currentPitch = reset ? 0 : Math.max(-12, Math.min(12, currentPitch + delta));
+    document.getElementById("pitchVal").textContent = (currentPitch > 0 ? "+" : "") + currentPitch;
+    if (audioCtx) applyLiveRateAndPitch();
+    updateChordDisplay(getCurrentPosition());
+  }
+
+  function changeTempo(delta, reset) {
+    if (isPlaying) {
+      savedOffset = getCurrentPosition();
+      playStartTime = audioCtx.currentTime;
+    }
+    currentTempo = reset ? 1.0 : Math.max(0.5, Math.min(1.5, +(currentTempo + delta).toFixed(2)));
+    document.getElementById("tempoVal").textContent = Math.round(currentTempo * 100) + "%";
+    if (audioCtx) applyLiveRateAndPitch();
+  }
+
+  function changeBpm(delta) {
+    baseBpm = Math.max(40, Math.min(240, baseBpm + delta));
+    document.getElementById("bpmVal").textContent = baseBpm;
+    document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+  }
+
+  function tapBpm() {
+    var now = performance.now();
+    if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+    tapTimes.push(now);
+    if (tapTimes.length >= 2) {
+      var intervals = [];
+      for (var i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i - 1]);
+      var avgMs = intervals.reduce(function(a, b) { return a + b; }, 0) / intervals.length;
+      baseBpm = Math.round(60000 / avgMs);
+      document.getElementById("bpmVal").textContent = baseBpm;
+      document.getElementById("mixerBpmBadge").textContent = baseBpm + " BPM";
+    }
+  }
+
+  function setLoopPoint(point) {
+    var pos = getCurrentPosition();
+    if (point === "A") {
+      loopA = pos;
+      document.getElementById("btnLoopA").classList.add("active-loop");
+    } else if (loopA !== null && pos > loopA) {
+      loopB = pos;
+      document.getElementById("btnLoopB").classList.add("active-loop");
+    }
+    document.getElementById("loopIndicator").textContent =
+      (loopA !== null ? "A " + formatTime(loopA) + "  " : "") + (loopB !== null ? "B " + formatTime(loopB) : "");
+  }
+
+  function clearLoop() {
+    loopA = null;
+    loopB = null;
+    document.getElementById("btnLoopA").classList.remove("active-loop");
+    document.getElementById("btnLoopB").classList.remove("active-loop");
+    document.getElementById("loopIndicator").textContent = "";
+  }
+
+  function getCurrentPosition() {
+    if (!isPlaying || !audioCtx) return savedOffset;
+    var elapsed = Math.max(0, audioCtx.currentTime - playStartTime) * currentTempo;
+    return savedOffset + elapsed;
+  }
+
+  function updateLoopUI() {
+    if (!isPlaying) return;
+    var pos = getCurrentPosition();
+
+    if (loopA !== null && loopB !== null && pos >= loopB) {
+      startNativeSources(loopA);
+      return;
+    }
+
+    if (pos >= songDuration) {
+      stopPlayback();
+      return;
+    }
+
+    if (pos >= firstBeatOffset) {
+      var beatDuration = 60 / baseBpm;
+      var adjustedPos = pos - firstBeatOffset;
+      var currentBeatIdx = Math.floor(adjustedPos / beatDuration);
+
+      if (currentBeatIdx !== lastPlayedBeatIndex) {
+        lastPlayedBeatIndex = currentBeatIdx;
+        var beatInBar = currentBeatIdx % 4;
+        highlightBeatDot(beatInBar);
+        if (metroEnabled) playClick(beatInBar === 0);
+      }
+    } else {
+      highlightBeatDot(-1);
+    }
+
+    document.getElementById("seekBar").value = pos;
+    document.getElementById("timeCurrent").textContent = formatTime(pos);
+    updateChordDisplay(pos);
+    animFrameId = requestAnimationFrame(updateLoopUI);
+  }
+
+  function enableControls(enabled) {
+    ["seekBar", "btnPlay", "btnStop", "btnLoopA", "btnLoopB", "btnLoopClear"].forEach(function(id) {
+      document.getElementById(id).disabled = !enabled;
+    });
+  }
+
+  function formatTime(sec) {
+    var m = Math.floor(sec / 60);
+    var s = Math.floor(sec % 60);
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function detectBpmFromBuffers(sources) {
+    var drumStem = sources.find(function(b) { return b.isDrum; }) || sources[0];
+    var buffer = drumStem.buffer;
+    var data = buffer.getChannelData(0);
+    var sr = buffer.sampleRate;
+
+    var maxSamples = Math.min(data.length, sr * 50);
+    var hop = Math.floor(sr * 0.005);
+    var env = [];
+    for (var i = 0; i < maxSamples; i += hop) {
+      var sum = 0;
+      for (var j = 0; j < hop && i + j < maxSamples; j++) {
+        var v = Math.abs(data[i + j]);
+        if (v > sum) sum = v;
+      }
+      env.push(sum);
+    }
+
+    var globalPeak = 0;
+    for (var p = 0; p < env.length; p++) {
+      if (env[p] > globalPeak) globalPeak = env[p];
+    }
+    var soundThreshold = globalPeak * 0.15;
+    var firstSoundFrame = 0;
+    for (var f = 0; f < env.length; f++) {
+      if (env[f] >= soundThreshold) {
+        firstSoundFrame = f;
+        break;
+      }
+    }
+    var exactFirstSoundSec = firstSoundFrame * 0.005;
+
+    var onset = env.map(function(v, i) { return i > 0 ? Math.max(0, v - env[i - 1]) : 0; });
+
+    var bestBpm = 120, bestCorr = -1;
+    for (var bpm = 70; bpm <= 165; bpm++) {
+      var lag = Math.round((60 / bpm) / 0.005);
+      var corr = 0;
+      for (var k = firstSoundFrame; k < onset.length - lag; k++) {
+        corr += onset[k] * onset[k + lag];
+      }
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestBpm = bpm;
+      }
+    }
+
+    return { bpm: bestBpm, offset: exactFirstSoundSec };
+  }
+
+  function detectChordsFromBuffers(sources) {
+    var harmonic = sources.filter(function(b) { return !b.isDrum && !/veus|voces|voz|vocal/i.test(b.name); });
+    var activeSources = harmonic.length > 0 ? harmonic : sources;
+
+    var sampleRate = activeSources[0].buffer.sampleRate;
+    var length = activeSources[0].buffer.length;
+    var stepSec = 0.5;
+    var stepSamples = Math.floor(sampleRate * stepSec);
+    var winSize = 4096;
+
+    var targetBins = [];
+    for (var midi = 36; midi <= 83; midi++) {
+      var freq = 440 * Math.pow(2, (midi - 69) / 12);
+      targetBins.push({ pc: midi % 12, omega: (2 * Math.PI * freq) / sampleRate });
+    }
+
+    var timeline = [];
+    var lastChordKey = "";
+
+    for (var offset = 0; offset + winSize < length; offset += stepSamples) {
+      var chroma = new Float32Array(12);
+      var frame = new Float32Array(winSize);
+      for (var s = 0; s < activeSources.length; s++) {
+        var ch = activeSources[s].buffer.getChannelData(0);
+        for (var i = 0; i < winSize; i++) frame[i] += ch[offset + i];
+      }
+
+      for (var b = 0; b < targetBins.length; b++) {
+        var bin = targetBins[b];
+        var coeff = 2 * Math.cos(bin.omega);
+        var s0 = 0, s1 = 0, s2 = 0;
+        for (var idx = 0; idx < winSize; idx++) {
+          s0 = frame[idx] + coeff * s1 - s2;
+          s2 = s1;
+          s1 = s0;
+        }
+        var power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+        chroma[bin.pc] += Math.sqrt(Math.max(0, power));
+      }
+
+      var bestScore = -1, bestRoot = 0, bestQuality = "";
+      for (var r = 0; r < 12; r++) {
+        var majScore = chroma[r] * 1.2 + chroma[(r + 4) % 12] + chroma[(r + 7) % 12] - chroma[(r + 3) % 12] * 0.5;
+        var minScore = chroma[r] * 1.2 + chroma[(r + 3) % 12] + chroma[(r + 7) % 12] - chroma[(r + 4) % 12] * 0.5;
+
+        if (majScore > bestScore) { bestScore = majScore; bestRoot = r; bestQuality = ""; }
+        if (minScore > bestScore) { bestScore = minScore; bestRoot = r; bestQuality = "m"; }
+      }
+
+      var key = bestRoot + bestQuality;
+      if (key !== lastChordKey && bestScore > 15) {
+        timeline.push({ time: offset / sampleRate, root: bestRoot, quality: bestQuality });
+        lastChordKey = key;
+      }
+    }
+    return timeline;
+  }
+
+  function formatTransposedChord(chordObj) {
+    if (!chordObj) return "--";
+    var transposedRoot = (chordObj.root + currentPitch + 120) % 12;
+    return NOTES[transposedRoot] + chordObj.quality;
+  }
+
+  function updateChordDisplay(pos) {
+    if (chordTimeline.length === 0) return;
+    var idx = 0;
+    for (var i = 0; i < chordTimeline.length; i++) {
+      if (chordTimeline[i].time <= pos) idx = i;
+      else break;
+    }
+    document.getElementById("chordCurrent").textContent = formatTransposedChord(chordTimeline[idx]);
+    document.getElementById("chordNext").textContent = formatTransposedChord(chordTimeline[idx + 1]);
+  }
+</script>
+</body>
+</html>
